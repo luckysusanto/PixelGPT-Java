@@ -1,12 +1,12 @@
 # [EMNLP'24 | Autoregressive Pre-Training on Pixels and Texts](https://aclanthology.org/2024.emnlp-main.182/)
 
-   <a href="https://huggingface.co/baidu" target="_blank">
+   <a href="https://huggingface.co/ernie-research" target="_blank">
       <img alt="Models" src="https://img.shields.io/badge/🤗-Models-blue" />
    </a>    
-   <a href="https://huggingface.co/datasets/baidu/rendered_GLUE" target="_blank">
+   <a href="https://huggingface.co/datasets/ernie-research/rendered_GLUE" target="_blank">
       <img alt="Datasets" src="https://img.shields.io/badge/📚-Data(rendered GLUE)-green" />
    </a> 
-   <a href="https://huggingface.co/datasets/baidu/rendered_xnli" target="_blank">
+   <a href="https://huggingface.co/datasets/ernie-research/rendered_xnli" target="_blank">
       <img alt="Datasets" src="https://img.shields.io/badge/📚-Data(rendered XNLI)-orange" />
    </a> 
    <a href="https://aclanthology.org/2024.emnlp-main.182/" target="_blank"><img alt="Paper" src="https://img.shields.io/badge/📜-Paper-purple" /></a>
@@ -18,7 +18,7 @@ The official repository which contains the code and model checkpoints for our pa
 
 ## 🔥 News
 * **21 September, 2024:** 🎉 Our work has been accepted to [EMNLP 2024](https://2024.emnlp.org/)! 🎉
-* **1 May, 2024:** 🎉 We release the official codebase and model weights of [`PixelGPT`](https://huggingface.co/baidu/PixelGPT), [`MonoGPT`](https://huggingface.co/baidu/MonoGPT), and [`DualGPT`](https://huggingface.co/baidu/DualGPT) . Stay tuned!🔥
+* **1 May, 2024:** 🎉 We release the official codebase and model weights of [`PixelGPT`](https://huggingface.co/ernie-research/PixelGPT), [`MonoGPT`](https://huggingface.co/ernie-research/MonoGPT), and [`DualGPT`](https://huggingface.co/ernie-research/DualGPT) . Stay tuned!🔥
   
 <img width="634" alt="image" src="https://github.com/ernie-research/pixelgpt/assets/13767887/1827f43f-34ca-448e-80ca-1fd0a523f213">
 
@@ -31,7 +31,7 @@ To set up the environment and install dependencies, run:
 bash run_requirements.sh
 ```
 ## 📚 Fine-tuning Data
-We fine-tune PixelGPT on the rendered GLUE and XNLI datasets. These rendered versions are publicly available at [baidu/rendered_GLUE](https://huggingface.co/datasets/baidu/rendered_GLUE) and [baidu/rendered_xnli](https://huggingface.co/datasets/baidu/rendered_xnli). After downloading the datasets from HuggingFace, extract them locally:
+We fine-tune PixelGPT on the rendered GLUE and XNLI datasets. These rendered versions are publicly available at [ernie-research/rendered_GLUE](https://huggingface.co/datasets/ernie-research/rendered_GLUE) and [ernie-research/rendered_xnli](https://huggingface.co/datasets/ernie-research/rendered_xnli). After downloading the datasets from HuggingFace, extract them locally:
 ```
 # Extract rendered GLUE
 tar -xvf rendered_glue.tar
@@ -42,7 +42,7 @@ tar -xvf rendered_xnli.tar
 For the rendered GLUE dataset, the extracted files contain multiple tasks. Each task has a corresponding training set, validation set, and test set. Note that for the MNLI task, both the validation and test sets contain matched and mismatched versions. You will need to assign the local paths of these task datasets to the `--train_file`, `--validation_file`, and `--test_file` parameters in the fine-tuning script.
 For the rendered XNLI dataset, assign the local dataset path to the `--data_file_dir` parameter in the corresponding fine-tuning script.
 ## 📌 Pre-trained Models
-We pre-trained PixelGPT and three other models: MonoGPT, and DualGPT. We release checkpoints used in our experiment, which can be downloaded at [baidu/PixelGPT](https://huggingface.co/baidu/PixelGPT), [baidu/MonoGPT](https://huggingface.co/baidu/MonoGPT), and [baidu/DualGPT](https://huggingface.co/baidu/DualGPT). Before running the fine-tuning scripts bellow, download the corresponding pre-trained models from our open-source model repository above and place the file in the pre-trained model directory, e.g. `pretrained_models/pixel_gpt`.
+We pre-trained PixelGPT and three other models: MonoGPT, and DualGPT. We release checkpoints used in our experiment, which can be downloaded at [ernie-research/PixelGPT](https://huggingface.co/ernie-research/PixelGPT), [ernie-research/MonoGPT](https://huggingface.co/ernie-research/MonoGPT), and [ernie-research/DualGPT](https://huggingface.co/ernie-research/DualGPT). Before running the fine-tuning scripts bellow, download the corresponding pre-trained models from our open-source model repository above and place the file in the pre-trained model directory, e.g. `pretrained_models/pixel_gpt`.
 
 ## 🚀 Fine-tuning
 Our main fine-tuning experiments were performed on rendered GLUE and XNLI. The scripts to run the experiments are given below.
