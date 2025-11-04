@@ -5,7 +5,8 @@
 # and OPT implementations in this library. It has been modified from its
 # original forms to accommodate minor architectural differences compared
 # to GPT-NeoX and OPT used by the Meta AI team that trained the model.
-#
+# in this library. It has been modified from its
+# original forms to accommod
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -104,7 +105,7 @@ from transformers.generation.utils import (
     ContrastiveSearchEncoderDecoderOutput, ContrastiveSearchDecoderOnlyOutput,
 )
 
-from scripts.generation.run_text_generation import MAX_LENGTH
+# from scripts.generation.run_text_generation import MAX_LENGTH # MAX_LENGTH isn't used anywhere, this just causes me error.
 GreedySearchOutput = Union[GreedySearchEncoderDecoderOutput, GreedySearchDecoderOnlyOutput]
 SampleOutput = Union[SampleEncoderDecoderOutput, SampleDecoderOnlyOutput]
 BeamSearchOutput = Union[BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput]
@@ -1066,6 +1067,9 @@ class ErniePixelModel(ErniePixelPreTrainedModel):
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
+        # print(f"[DEBUG:ErniePixelModel] input_ids={None if input_ids is None else input_ids.shape}, "
+        #     f"pixel_values={None if pixel_values is None else pixel_values.shape}")
+
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -1104,8 +1108,11 @@ class ErniePixelModel(ErniePixelPreTrainedModel):
                 ("pixel", pixel_embeds.shape[1]),
                 ("text", text_embeds.shape[1]), 
             ]
+            # print("[DEBUG:ErniePixelModel-inputs_embeds] torch.cat inputs:", [None if x is None else x.shape for x in pixel_embeds])  
+            # print("[DEBUG:ErniePixelModel-text_embeds] torch.cat inputs:", [None if x is None else x.shape for x in text_embeds])          
             inputs_embeds = torch.cat([pixel_embeds, text_embeds], dim=1)
             batch_size, seq_length = inputs_embeds.shape[:2]
+            # print("[DEBUG:ErniePixelModel-attn_mask] torch.cat inputs:", [None if x is None else x.shape for x in patch_attention_mask])
             attention_mask = torch.cat([patch_attention_mask, attention_mask], dim=1)
             
 
@@ -1362,22 +1369,41 @@ class ErniePixelForCausalLM(ErniePixelPreTrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
-            input_ids=input_ids,
-            pixel_values=pixel_values,
-            num_patches=num_patches,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+        # print(f"[DEBUG] input_ids={None if input_ids is None else input_ids.shape}, "
+        #   f"pixel_values={None if pixel_values is None else pixel_values.shape}, "
+        #   f"labels={None if labels is None else labels.shape}, "
+        #   f"return_dict={return_dict}")
+        # print("[DEBUG] Calling self.model.forward() ...")
+        # print(f"[DEBUG] self.model type={type(self.model)}")
+        try:
+            outputs = self.model(
+                input_ids=input_ids,
+                pixel_values=pixel_values,
+                num_patches=num_patches,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                patch_attention_mask=pixel_attention_mask,
+                return_dict=return_dict,
+            )
+            # print(f"[DEBUG] self.model.forward() returned type={type(outputs)}")
+            # if isinstance(outputs, dict):
+            #     print(f"[DEBUG] Keys: {list(outputs.keys())}")
+            # elif isinstance(outputs, (tuple, list)):
+            #     print(f"[DEBUG] Length={len(outputs)}, element types={[type(x) for x in outputs]}")
+        except Exception as e:
+            # print(f"[DEBUG ❌] self.model.forward() raised: {e}")
+            raise
+
+
+        # print(f"[DEBUG] outputs type={type(outputs)}, len={len(outputs) if isinstance(outputs, tuple) else 'n/a'}")
 
         hidden_states = outputs[0]
+        # print(f"[DEBUG] hidden_states={hidden_states.shape if hidden_states is not None else None}")
 
         logits_token, logits_pixel = None, None
         if self.config.pretraining_tp > 1:
@@ -1390,29 +1416,30 @@ class ErniePixelForCausalLM(ErniePixelPreTrainedModel):
             logits_pixel = [F.linear(hidden_states, lm_pixel_head_slices[i]) for i in range(self.config.pretraining_tp)]
             logits_pixel = torch.cat(logits_pixel, dim=-1)
         else:
-            # mono pixel
-            if pixel_values is not None and input_ids is None:
-                logits_pixel = self.lm_pixel_head(hidden_states)
-            # mono text
-            elif input_ids is not None and pixel_values is None:
-                logits_token = self.lm_token_head(hidden_states)
-            # pixel-text pair
-            elif input_ids is not None and pixel_values is not None:
-                # split and process separately
-                split_args = outputs[-1]
-                assert len(split_args) == 2
-                split_sections = [l[1] for l in split_args]
-                split_modes = [l[0] for l in split_args]
-                split_hiddens = torch.split(hidden_states, split_sections, dim=1)
-                # head attribute
-                for mode, hidden in zip(split_modes, split_hiddens):
-                    if mode == "text":
-                        logits_token = self.lm_token_head(hidden)
-                    elif mode == "pixel":
-                        logits_pixel = self.lm_pixel_head(hidden)
-                    else:
-                        raise ValueError("mode should be either 'text' or 'pixel'. Contact @chaiyekun")
+                if pixel_values is not None and input_ids is None:
+                    logits_pixel = self.lm_pixel_head(hidden_states)
+                    # print(f"[DEBUG] logits_pixel (mono pixel) = {logits_pixel.shape}")
+                elif input_ids is not None and pixel_values is None:
+                    logits_token = self.lm_token_head(hidden_states)
+                    # print(f"[DEBUG] logits_token (mono text) = {logits_token.shape}")
+                elif input_ids is not None and pixel_values is not None:
+                    # print("[DEBUG] pixel-text pair detected")
+                    split_args = outputs[-1]
+                    # print(f"[DEBUG] split_args={split_args}")
+                    assert len(split_args) == 2
+                    split_sections = [l[1] for l in split_args]
+                    split_modes = [l[0] for l in split_args]
+                    split_hiddens = torch.split(hidden_states, split_sections, dim=1)
+                    for mode, hidden in zip(split_modes, split_hiddens):
+                        # print(f"[DEBUG] {mode} hidden={hidden.shape}")
+                        if mode == "text":
+                            logits_token = self.lm_token_head(hidden)
+                            # print(f"[DEBUG] logits_token={logits_token.shape}")
+                        elif mode == "pixel":
+                            logits_pixel = self.lm_pixel_head(hidden)
+                            # print(f"[DEBUG] logits_pixel={logits_pixel.shape}")
 
+        device = None
         if pixel_values is not None:
             logits_pixel = logits_pixel.float()
             device = logits_pixel.device
@@ -1420,26 +1447,34 @@ class ErniePixelForCausalLM(ErniePixelPreTrainedModel):
             logits_token = logits_token.float()
             device = logits_token.device
 
+        # print(f"[DEBUG] Using device={device}")
+
         loss = torch.tensor(0.0).to(device)
         """ NTP loss """
         if input_ids is not None and labels is not None:
+            # print("[DEBUG] Computing token loss...")
             # Shift so that tokens < n predict n
             shift_logits = logits_token[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
+            # print(f"[DEBUG] shift_logits={shift_logits.shape}, shift_labels={shift_labels.shape}")
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
             shift_logits = shift_logits.view(-1, self.config.vocab_size)
             shift_labels = shift_labels.view(-1)
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
+            
             loss += loss_fct(shift_logits, shift_labels)
         """ NPP loss """
         if pixel_values is not None:
+            # print("[DEBUG] Computing pixel loss...")
             loss += self.forward_pixel_loss(pixel_values, logits_pixel, pixel_attention_mask if pixel_attention_mask is not None else attention_mask)
         if not return_dict:
             output = (logits_token, logits_pixel,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
+        # print(f"[DEBUG] Final loss={loss.item() if torch.is_tensor(loss) else loss}")
+        
         return ErniePixelCausalLMOutputWithPast(
             loss=loss,
             logits=logits_token if logits_token is not None else logits_pixel,
@@ -2527,3 +2562,139 @@ class ErniePixelForSequenceClassification(ErniePixelPreTrainedModel):
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
+
+class ErniePixelForImageTransliteration(ErniePixelForCausalLM):
+    def __init__(self, config):
+        # Task kita sama saja dengan CausalLM, tapi ga perlu predict image
+        # Essentially: 
+        #   Input = (p1, p2, p3, t1, t2)
+        #   Output = (t1, t2)
+        # Kenapa tetap input (image, text)? Teacher forcing
+        # It's kinda the only way to get the loss, kekw
+        super().__init__(config)
+        self.model = ErniePixelModel(config)
+        self.vocab_size = config.vocab_size
+        self.lm_token_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.lm_pixel_head = nn.Linear(config.hidden_size, config.patch_size**2*config.num_channels, bias=False)
+        self.hidden_size = config.hidden_size
+
+    # So, just need to change the forward function and we're good
+    def forward(
+        self,
+        input_ids: torch.LongTensor = None,
+        pixel_values: torch.Tensor = None,
+        num_patches: torch.Tensor = None,
+        attention_mask: torch.Tensor = None,
+        pixel_attention_mask: torch.Tensor = None,
+        position_ids: torch.LongTensor = None,
+        past_key_values: torch.Tensor = None,
+        inputs_embeds: torch.Tensor = None,
+        labels: torch.LongTensor = None,
+        use_cache: bool = None,
+        output_attentions: bool = None,
+        output_hidden_states: bool = None,
+        return_dict: bool = None,
+    ) -> ErniePixelCausalLMOutputWithPast:
+        
+        # This entire section is IDENTICAL to the original ErniePixelForCausalLM.
+        # It gets the outputs from the base Transformer model, splits the
+        # hidden states, and applies the correct prediction head to each part.
+        
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.model(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            num_patches=num_patches,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            patch_attention_mask=pixel_attention_mask,
+            return_dict=return_dict,
+        )
+
+        hidden_states = outputs[0]
+        logits_token, logits_pixel = None, None
+
+        # This logic for getting logits remains unchanged.
+        if self.config.pretraining_tp > 1:
+            # Based on HF, tp = tensor parallelism, not sure what it is, too afraid to touch it
+            # lm token head
+            lm_token_head_slices = self.lm_token_head.weight.split(self.vocab_size // self.config.pretraining_tp, dim=0)
+            logits_token = [F.linear(hidden_states, lm_token_head_slices[i]) for i in range(self.config.pretraining_tp)]
+            logits_token = torch.cat(logits_token, dim=-1)
+            # lm pixel head
+            lm_pixel_head_slices = self.lm_pixel_head.weight.split(self.hidden_size // self.config.pretraining_tp, dim=0)
+            logits_pixel = [F.linear(hidden_states, lm_pixel_head_slices[i]) for i in range(self.config.pretraining_tp)]
+            logits_pixel = torch.cat(logits_pixel, dim=-1)
+        else:
+            # mono pixel
+            if pixel_values is not None and input_ids is None:
+                logits_pixel = self.lm_pixel_head(hidden_states)
+            # mono text
+            elif input_ids is not None and pixel_values is None:
+                logits_token = self.lm_token_head(hidden_states)
+            # pixel-text pair
+            elif input_ids is not None and pixel_values is not None:
+                split_args = outputs[-1]
+                assert len(split_args) == 2
+                split_sections = [l[1] for l in split_args]
+                split_modes = [l[0] for l in split_args]
+                # print(f"[DEBUG] outputs[-1]={outputs[-1]}")
+                # print(f"[DEBUG] hidden_states={hidden_states.shape}")
+
+                split_hiddens = torch.split(hidden_states, split_sections, dim=1)
+                for mode, hidden in zip(split_modes, split_hiddens):
+                    if mode == "text":
+                        logits_token = self.lm_token_head(hidden)
+                    elif mode == "pixel":
+                        logits_pixel = self.lm_pixel_head(hidden)
+                        
+        device = None
+        if pixel_values is not None:
+            logits_pixel = logits_pixel.float()
+            device = logits_pixel.device
+        if input_ids is not None:
+            logits_token = logits_token.float()
+            device = logits_token.device
+        # CHANGED PART
+        loss = torch.tensor(0.0).to(device)
+
+        """ NTP loss """
+        if input_ids is not None and labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits_token[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            shift_logits = shift_logits.view(-1, self.config.vocab_size)
+            shift_labels = shift_labels.view(-1)
+            # Enable model parallelism
+            shift_labels = shift_labels.to(shift_logits.device)
+            loss += loss_fct(shift_logits, shift_labels)
+        
+        # NPP Loss removed
+
+        # The return logic is kept identical for API consistency.
+        if not return_dict:
+            output = (logits_token, logits_pixel,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
+
+        return ErniePixelCausalLMOutputWithPast(
+            loss=loss,
+            logits=logits_token if logits_token is not None else logits_pixel,
+            logits_token=logits_token,
+            logits_pixel=logits_pixel,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+        

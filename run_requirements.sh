@@ -15,12 +15,12 @@ pip install torch==1.12.1 torchvision
 pip install tensorboard
 
 # 安装 accelerate
-pip install accelerate
+pip install accelerate==1.0.0
 
 # 安装 evluate
-export https_proxy=http://172.19.57.45:3128;export http_proxy=http://172.19.57.45:3128
+# export https_proxy=http://172.19.57.45:3128;export http_proxy=http://172.19.57.45:3128 | Dropped because BUSCC don't need a proxy
 git clone https://github.com/huggingface/evaluate.git
-unset https_proxy;unset http_proxy
+# unset https_proxy;unset http_proxy
 cd evaluate
 pip install -e .
 cd ..

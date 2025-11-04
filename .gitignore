@@ -2,6 +2,10 @@ pretrained_models/
 sst2-test/
 evaluate/
 test/
+tests/
+experiments/
+experiment_scripts/
+hf_cache/
 wandb/
 **/__pycache__/
 *.pyc
