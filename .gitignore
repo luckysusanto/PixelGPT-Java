@@ -4,6 +4,7 @@ evaluate/
 test/
 tests/
 experiments/
+experiment_output/
 experiment_scripts/
 hf_cache/
 wandb/
