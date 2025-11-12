@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: pixel
 Version: 0.0.1
 Summary: Research code for the paper 'Language Modelling with Pixels'
@@ -7,3 +7,9 @@ Author: Team PIXEL
 Author-email: p.rust@di.ku.dk
 License: Apache
 License-File: LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: summary
