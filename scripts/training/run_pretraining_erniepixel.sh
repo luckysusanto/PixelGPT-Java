@@ -8,10 +8,11 @@
 
 # --- BU SCC Grid Engine Directives ---
 #$ -P multilm                                    # Project allocation
-#$ -l gpus=1                                     # Request 4 GPUs on a single node. The scheduler will set CUDA_VISIBLE_DEVICES.
+#$ -l gpus=2                                     # Request 4 GPUs on a single node. The scheduler will set CUDA_VISIBLE_DEVICES.
+#$ -pe omp 2
 #$ -l gpu_type=A40                               # Request specific GPU type
 #$ -l h_rt=24:00:00                              # Request 24 hours of runtime
-#$ -N OneGPU_OneCore_DualGPT_java_pretrain                      # Job name
+#$ -N OneGPUPerCore__FourGPU_DualGPT_java_pretrain                      # Job name
 #$ -j y                                          # Join stdout and stderr
 #$ -o 1Core_1GPU_dualgpt_pretrain_$JOB_ID.log               # Specify the log file name
 
@@ -84,12 +85,25 @@ echo "-----------------------------------------"
 # -----------------------------------------------------------------------------------------
 GPU_LOG_FILE="${OUTPUT_DIR}/gpu_memory_usage_${JOB_ID}.csv"
 echo "Starting GPU memory logging to ${GPU_LOG_FILE}"
+trap "kill $GPU_MONITOR_PID" EXIT
 nvidia-smi --query-gpu=timestamp,memory.used,memory.total --format=csv -l 5 >> "${GPU_LOG_FILE}" &
 GPU_MONITOR_PID=$!
 
 # -----------------------------------------------------------------------------------------
 # --- EXECUTION ---
 # -----------------------------------------------------------------------------------------
+
+# Set environment variables for more detailed debugging logs
+# This will provide a lot of information about the NCCL communication calls.
+export NCCL_DEBUG=INFO
+# This will give detailed logs from PyTorch's distributed module.
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
+# As a troubleshooting step for network/hardware issues, you can try disabling
+# peer-to-peer (P2P) communication or InfiniBand (IB), forcing a slower but
+# potentially more stable communication path. Uncomment one of these if the
+# INFO logs point to P2P or IB errors.
+# export NCCL_P2P_DISABLE=1
+# export NCCL_IB_DISABLE=1
 
 # `accelerate launch` will now automatically detect the number of GPUs from the
 # CUDA_VISIBLE_DEVICES environment variable set by the qsub scheduler.
@@ -108,12 +122,12 @@ accelerate launch --main_process_port 29700 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME
     --num_train_epochs ${NUM_EPOCHS} \
     --report_to "${LOGGING_INTEGRATION}" \
     --run_name "${RUN_NAME}" \
-    --dataloader_drop_last True # <--- ADDED THIS LINE
+    --dataloader_drop_last
 
 # -----------------------------------------------------------------------------------------
 # --- CLEANUP ---
 # -----------------------------------------------------------------------------------------
 echo "Training finished. Stopping GPU memory logger (PID: ${GPU_MONITOR_PID})."
-kill $GPU_MONITOR_PID
+trap "kill $GPU_MONITOR_PID" EXIT # In case it fails
 
 echo "Pretraining job complete."

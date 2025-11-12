@@ -66,7 +66,13 @@ class ModelArguments:
     config_overrides: Optional[str] = field(
         default=None, metadata={"help": "Comma-separated overrides for config when instantiating from scratch."}
     )
-    image_size: int = field(default=224, metadata={"help": "Image height/width for preprocessing."})
+    image_size: List[int] = field(
+        default_factory=lambda: [16, 16384],
+        metadata={
+            "help": "Image height and width for preprocessing. Pass two integers.",
+            "nargs": 2
+        }
+    )
     patch_size: int = field(default=16, metadata={"help": "Patch size used by the model."})
     num_channels: int = field(default=3, metadata={"help": "Number of image channels."})
     hidden_size: int = field(default=768, metadata={"help": "Model hidden size."})
@@ -81,14 +87,14 @@ class DataTrainingArguments:
     train_split: str = field(default="train", metadata={"help": "Split name for training."})
     image_column: str = field(default="pixel_values", metadata={"help": "Column that holds raw image data (PIL/ndarray)."})
     text_column: str = field(default="token_ids", metadata={"help": "Column that holds text strings or token ids."})
-    max_seq_length: int = field(default=512, metadata={"help": "Maximum text sequence length (tokens)."})
+    max_seq_length: int = field(default=1024, metadata={"help": "Maximum text sequence length (tokens)."})
     cache_dir: Optional[str] = field(default=None, metadata={"help": "HF dataset cache dir."})
 
 
 @dataclass
 class CustomTrainingArguments(TrainingArguments):
     output_dir: str = field(
-        default="./dualgpt-pretrain-output",
+        default="../experiment_output/dualgpt-pretrain-output",
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
     per_device_train_batch_size: int = field(
@@ -151,7 +157,7 @@ class CustomTrainingArguments(TrainingArguments):
         default=None, metadata={"help": "Base LR scaling (optional). absolute_lr = base_lr * total_batch / 256"}
     )
     ddp_find_unused_parameters: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Perform layer scan to find unused layers. Set to False as it defaults to True in accelerate."}
     )
 
@@ -200,44 +206,72 @@ def collate_fn(batch: List[Dict[str, Any]], tokenizer: Any, patch_size: int) -> 
 # -------------------------
 # Utility: preprocessing
 # -------------------------
-def make_preprocess_fn(tokenizer, image_column, text_column, max_seq_length):
+def make_preprocess_fn(tokenizer, image_column, text_column, max_seq_length, image_size, num_channels):
+    """
+    Creates a preprocessing function that handles image transformations and, crucially,
+    formats PRE-TOKENIZED text input to ensure correct truncation and EOS termination.
+    """
+    # Define the image transformation pipeline (this part is correct and unchanged)
+    image_transform = transforms.Compose([
+        transforms.ToPILImage(), # Ensure input is a PIL Image
+        transforms.Resize(image_size, interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.ToTensor(), # Converts HWC [0,255] PIL Image to CHW [0,1] Tensor
+    ])
+    
+    # Define the placeholder tensor for corrupted images (this part is correct and unchanged)
+    placeholder_tensor = torch.zeros((num_channels, image_size[0], image_size[1]), dtype=torch.float32)
+
     def preprocess(examples):
+        # --- Image Handling (Correct and Unchanged) ---
         imgs = []
-        # <--- MODIFICATION START: Added robust error handling for images --->
-        for i, arr in enumerate(examples[image_column]):
+        for i, pil_image in enumerate(examples[image_column]):
             try:
-                img_np = np.array(arr, dtype=np.float32)  # keep original pixel scale
-                if img_np.ndim == 2:                      # grayscale → RGB
-                    img_np = np.stack([img_np]*3, axis=-1)
-
+                # Ensure image is in RGB format
+                if pil_image.mode != 'RGB':
+                    pil_image = pil_image.convert('RGB')
+                
                 # Check for corrupted images (e.g., zero size)
-                if img_np.shape[0] == 0 or img_np.shape[1] == 0:
-                    raise ValueError(f"Corrupted image with zero dimension: {img_np.shape}")
-
-                # HWC → CHW for Conv2d
-                img_tensor = torch.from_numpy(img_np).permute(2, 0, 1)
-                imgs.append(img_tensor)
+                if pil_image.width == 0 or pil_image.height == 0:
+                    raise ValueError(f"Corrupted image with zero dimension: ({pil_image.width}, {pil_image.height})")
+                
+                imgs.append(image_transform(pil_image))
             except Exception as e:
-                # If an image fails, log the error and use a placeholder black image
-                item_index = examples['index'][i] if 'index' in examples else f"#{i} in batch (no global index)"
-                logger.error(f"Error processing image with global index {item_index}: {e}. Using a placeholder.")
-                # Create a black image placeholder of the correct expected shape (assuming 3 channels, 224x224)
-                placeholder_tensor = torch.zeros((3, 224, 224), dtype=torch.float32)
+                item_index = examples['index'][i] if 'index' in examples else f"#{i} in batch"
+                logger.warning(f"Error processing image with index {item_index}: {e}. Using a placeholder.")
                 imgs.append(placeholder_tensor)
-        # <--- MODIFICATION END --->
+
         examples["pixel_values"] = imgs
 
-        # text handling (same as before)
-        if isinstance(examples[text_column][0], list):
-            examples["input_ids"] = examples[text_column]
-        else:
-            tokenized = tokenizer(
-                examples[text_column],
-                max_length=max_seq_length,
-                truncation=True,
-                padding=False
-            )
-            examples["input_ids"] = tokenized["input_ids"]
+        # --- NEW: Text Handling for PRE-TOKENIZED Data ---
+        # This logic correctly handles lists of token IDs.
+        
+        # We need the tokenizer just for its special token IDs.
+        eos_token_id = tokenizer.eos_token_id
+        if eos_token_id is None:
+            raise ValueError("Tokenizer must have an EOS token defined for Causal LM pretraining.")
+
+        processed_input_ids = []
+        for token_ids in examples[text_column]:
+            # Create a mutable copy to work with.
+            current_ids = list(token_ids)
+
+            # 1. Sanitize: Remove any pre-existing EOS token to prevent duplication.
+            #    This makes the function robust even if some data already has an EOS.
+            if current_ids and current_ids[-1] == eos_token_id:
+                current_ids.pop()
+            
+            # 2. Truncate: Trim the sequence to make space for the new EOS token.
+            #    We truncate to max_seq_length - 1.
+            if len(current_ids) > max_seq_length - 1:
+                current_ids = current_ids[:max_seq_length - 1]
+            
+            # 3. Terminate: Append the definitive EOS token.
+            #    Now the sequence is guaranteed to be <= max_seq_length and end with EOS.
+            current_ids.append(eos_token_id)
+            
+            processed_input_ids.append(current_ids)
+        
+        examples["input_ids"] = processed_input_ids
         return examples
     return preprocess
 
@@ -245,27 +279,33 @@ def make_preprocess_fn(tokenizer, image_column, text_column, max_seq_length):
 # Main flow
 # -------------------------
 def main():
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(True) # FOR DEBUGGING ONLY
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, CustomTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    os.makedirs(training_args.output_dir, exist_ok=True)
     logger.info(f"Model args: {model_args}")
     logger.info(f"Data args: {data_args}")
     logger.info(f"Training args: {training_args}")
 
-    set_seed(training_args.seed)
+    set_seed(training_args.seed) # default to 42
 
     logger.info(f"Loading tokenizer from: {model_args.tokenizer_path}")
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_path)
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
-    # This processor is defined but was not used. It's good practice to keep it or remove it.
-    # We are performing the transforms manually in `make_preprocess_fn`.
-    processor = transforms.Compose([
-        transforms.Resize((model_args.image_size, model_args.image_size)),
-        transforms.ToTensor(),  # Converts HWC [0,255] → CHW [0,1]
-    ])
+    # # Ensure PAD token exists (same across ranks)
+    # if tokenizer.pad_token is None:
+    #     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+    # --- synchronize tokenizer across all processes ---
+    # I think this is the cause of the vocab size missmatch.
+    if torch.distributed.is_initialized():
+        if torch.distributed.get_rank() == 0:
+            tokenizer.save_pretrained(training_args.output_dir)
+        torch.distributed.barrier()
+        tokenizer = AutoTokenizer.from_pretrained(training_args.output_dir)
+    # ---------------------------------------------------
+
 
     if model_args.model_name_or_path:
         logger.info(f"Loading model from {model_args.model_name_or_path}")
@@ -286,7 +326,7 @@ def main():
             rms_norm_eps=1e-6,
         )
         model = ErniePixelForCausalLM(config)
-        model.resize_token_embeddings(len(tokenizer))
+        # model.resize_token_embeddings(len(tokenizer)) -- Redundant.
 
     model.gradient_checkpointing_enable()
     if hasattr(model.config, "use_cache"):
@@ -295,15 +335,19 @@ def main():
     logger.info(f"Loading dataset '{data_args.dataset_name}'...")
     ds = load_dataset(data_args.dataset_name, split=data_args.train_split, cache_dir=data_args.cache_dir)
     
-    # <--- MODIFICATION START: Add a global index column for better error logging --->
     ds = ds.add_column("index", range(len(ds)))
     logger.info(f"Dataset loaded, number of examples: {len(ds)}")
-    # <--- MODIFICATION END --->
 
     logger.info("Setting dataset transform...")
     preprocess_fn = make_preprocess_fn(
-        tokenizer, data_args.image_column, data_args.text_column, data_args.max_seq_length
+        tokenizer,
+        data_args.image_column,
+        data_args.text_column,
+        data_args.max_seq_length,
+        model_args.image_size,
+        model_args.num_channels,
     )
+
     ds.set_transform(preprocess_fn)
 
     from functools import partial
@@ -311,10 +355,9 @@ def main():
 
     if training_args.base_learning_rate:
         total_train_batch_size = (
-            training_args.train_batch_size * training_args.gradient_accumulation_steps * training_args.world_size
+            training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps * training_args.world_size
         )
         training_args.learning_rate = training_args.base_learning_rate * total_train_batch_size / 256
-        logger.info(f"Using scaled learning rate: {training_args.learning_rate}")
 
     max_steps = training_args.max_steps if training_args.max_steps > 0 else 1_000_000
     checkpoint_steps = [500, 5000] + list(range(10000, int(max_steps) + 1, 10000))
