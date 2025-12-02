@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-DualGPT (ErniePixelForCausalLM) pretraining script.
-Modeled after the official PIXEL pretrain.py, but adapted for a causal,
-decoder-only multimodal model.
+DualGPT (ErniePixelForCausalLM) continued pretraining script.
+This script loads a pretrained model, resizes token embeddings for a new tokenizer
+(cold start), and continues pretraining on a new dataset.
 """
 
 # ---------- memory/threads/multiprocessing guards ----------
@@ -57,7 +57,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(
-        default=None, metadata={"help": "Optional pretrained model path to initialize from."}
+        default="ernie-research/DualGPT", 
+        metadata={"help": "The base pretrained model to start from (e.g., 'ernie-research/DualGPT')."}
     )
     tokenizer_path: str = field(
         default="izzako/javanese-llama-tokenizer",
@@ -69,16 +70,16 @@ class ModelArguments:
     image_size: List[int] = field(
         default_factory=lambda: [16, 16384],
         metadata={
-            "help": "Image height and width for preprocessing. Pass two integers.",
+            "help": "Image height and width for preprocessing. Only used if not in model config.",
             "nargs": 2
         }
     )
-    patch_size: int = field(default=16, metadata={"help": "Patch size used by the model."})
-    num_channels: int = field(default=3, metadata={"help": "Number of image channels."})
-    hidden_size: int = field(default=768, metadata={"help": "Model hidden size."})
-    intermediate_size: int = field(default=3072, metadata={"help": "Model intermediate size."})
-    num_hidden_layers: int = field(default=12, metadata={"help": "Number of hidden layers."})
-    num_attention_heads: int = field(default=12, metadata={"help": "Number of attention heads."})
+    patch_size: int = field(default=16, metadata={"help": "Patch size. Only used if not in model config."})
+    num_channels: int = field(default=3, metadata={"help": "Image channels. Only used if not in model config."})
+    hidden_size: int = field(default=768, metadata={"help": "Hidden size. Only used if not in model config."})
+    intermediate_size: int = field(default=3072, metadata={"help": "Intermediate size. Only used if not in model config."})
+    num_hidden_layers: int = field(default=12, metadata={"help": "Num layers. Only used if not in model config."})
+    num_attention_heads: int = field(default=12, metadata={"help": "Num heads. Only used if not in model config."})
 
 
 @dataclass
@@ -86,7 +87,7 @@ class DataTrainingArguments:
     dataset_name: str = field(metadata={"help": "Hugging Face dataset id for training (e.g. username/dataset_name)"})
     train_split: str = field(default="train", metadata={"help": "Split name for training."})
     image_column: str = field(default="pixel_values", metadata={"help": "Column that holds raw image data (PIL/ndarray)."})
-    text_column: str = field(default="token_ids", metadata={"help": "Column that holds text strings or token ids."})
+    text_column: str = field(default="token_ids", metadata={"help": "Column that holds pre-tokenized text ids."})
     max_seq_length: int = field(default=1024, metadata={"help": "Maximum text sequence length (tokens)."})
     cache_dir: Optional[str] = field(default=None, metadata={"help": "HF dataset cache dir."})
 
@@ -104,16 +105,16 @@ class CustomTrainingArguments(TrainingArguments):
         default=3.0, metadata={"help": "Total number of training epochs to perform."}
     )
     learning_rate: float = field(
-        default=5e-4, metadata={"help": "The initial learning rate from the paper."}
+        default=5e-4, metadata={"help": "The initial learning rate."}
     )
     lr_scheduler_type: str = field(
-        default='linear', metadata={"help": "The scheduler type to use. Matches paper."}
+        default='linear', metadata={"help": "The scheduler type to use."}
     )
     adam_beta1: float = field(
-        default=0.9, metadata={"help": "Beta1 for AdamW optimizer. Matches paper."}
+        default=0.9, metadata={"help": "Beta1 for AdamW optimizer."}
     )
     adam_beta2: float = field(
-        default=0.999, metadata={"help": "Beta2 for AdamW optimizer. Matches paper."}
+        default=0.999, metadata={"help": "Beta2 for AdamW optimizer."}
     )
     weight_decay: float = field(
         default=0.01, metadata={"help": "Weight decay for AdamW optimizer."}
@@ -122,7 +123,7 @@ class CustomTrainingArguments(TrainingArguments):
         default=1000, metadata={"help": "Linear warmup over warmup_steps."}
     )
     bf16: bool = field(
-        default=True, metadata={"help": "Whether to use bf16 (mixed) precision. Matches paper."}
+        default=True, metadata={"help": "Whether to use bf16 (mixed) precision."}
     )
     fp16: bool = field(
         default=False, metadata={"help": "Whether to use fp16 (mixed) precision. Disabled to prefer bf16."}
@@ -139,11 +140,11 @@ class CustomTrainingArguments(TrainingArguments):
     )
     save_total_limit: int = field(
         default=20,
-        metadata={"help": "Limit the total amount of checkpoints. Deletes the older checkpoints in the output_dir."},
+        metadata={"help": "Limit the total amount of checkpoints."},
     )
     remove_unused_columns: bool = field(
         default=False,
-        metadata={"help": "Remove columns not used by the model forward pass. Should be False for this script."},
+        metadata={"help": "Remove columns not used by the model forward pass."},
     )
     report_to: Optional[List[str]] = field(
         default_factory=lambda: ["tensorboard"],
@@ -151,14 +152,14 @@ class CustomTrainingArguments(TrainingArguments):
     )
     dataloader_num_workers: int = field(
         default=0,
-        metadata={"help": "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."},
+        metadata={"help": "Number of subprocesses to use for data loading."},
     )
     base_learning_rate: Optional[float] = field(
-        default=None, metadata={"help": "Base LR scaling (optional). absolute_lr = base_lr * total_batch / 256"}
+        default=None, metadata={"help": "Base LR scaling (optional)."}
     )
     ddp_find_unused_parameters: bool = field(
-        default=True,
-        metadata={"help": "Perform layer scan to find unused layers. Set to False as it defaults to True in accelerate."}
+        default=False,
+        metadata={"help": "Disable find_unused_parameters for a potential speedup."}
     )
 
 
@@ -183,18 +184,22 @@ class CustomCheckpointCallback(TrainerCallback):
 def collate_fn(batch: List[Dict[str, Any]], tokenizer: Any, patch_size: int) -> Dict[str, torch.Tensor]:
     pixel_values = torch.stack([item['pixel_values'] for item in batch])
     input_ids_list = [torch.tensor(item['input_ids']) for item in batch]
+    
     padded_input_ids = pad_sequence(
         input_ids_list, batch_first=True, padding_value=tokenizer.pad_token_id
     )
     text_attention_mask = (padded_input_ids != tokenizer.pad_token_id).long()
+    
     num_patches_h = pixel_values.shape[2] // patch_size
-    assert num_patches_h == 1, f"WARNING: Height patch should be 1, got {num_patches_h} instead."
+    assert num_patches_h == 1, f"Image height must be exactly one patch high. Got {num_patches_h} patches."
     num_patches_w = pixel_values.shape[3] // patch_size
     num_patches = num_patches_h * num_patches_w
     pixel_attention_mask = torch.ones(pixel_values.shape[0], num_patches, dtype=torch.long)
+    
     labels = pad_sequence(
-        input_ids_list, batch_first=True, padding_value=-100
+        input_ids_list, batch_first=True, padding_value=-100 # -100 is the standard ignore_index for CrossEntropyLoss
     )
+    
     return {
         "pixel_values": pixel_values,
         "input_ids": padded_input_ids,
@@ -207,72 +212,51 @@ def collate_fn(batch: List[Dict[str, Any]], tokenizer: Any, patch_size: int) -> 
 # Utility: preprocessing
 # -------------------------
 def make_preprocess_fn(tokenizer, image_column, text_column, max_seq_length, image_size, num_channels):
-    """
-    Creates a preprocessing function that handles image transformations and, crucially,
-    formats PRE-TOKENIZED text input to ensure correct truncation and EOS termination.
-    """
-    # Define the image transformation pipeline (this part is correct and unchanged)
     image_transform = transforms.Compose([
         transforms.Resize(image_size, interpolation=transforms.InterpolationMode.BICUBIC),
-        transforms.ToTensor(), # Converts HWC [0,255] PIL Image to CHW [0,1] Tensor
+        transforms.ToTensor(),
     ])
     
-    # Define the placeholder tensor for corrupted images (this part is correct and unchanged)
     placeholder_tensor = torch.zeros((num_channels, image_size[0], image_size[1]), dtype=torch.float32)
 
     def preprocess(examples):
-        # --- Image Handling (Correct and Unchanged) ---
+        # Image Handling
         imgs = []
         for i, pil_image in enumerate(examples[image_column]):
             try:
-                # Ensure image is in RGB format
-                if isinstance(pil_image, list):
-                    pil_image = Image.fromarray(np.uint8(pil_image))
-                elif isinstance(pil_image, np.ndarray):
-                    pil_image = Image.fromarray(pil_image.astype(np.uint8))
+                if isinstance(pil_image, (list, np.ndarray)):
+                    pil_image = Image.fromarray(np.array(pil_image, dtype=np.uint8))
 
                 if pil_image.mode != 'RGB':
                     pil_image = pil_image.convert('RGB')
                 
-                # Check for corrupted images (e.g., zero size)
                 if pil_image.width == 0 or pil_image.height == 0:
-                    raise ValueError(f"Corrupted image with zero dimension: ({pil_image.width}, {pil_image.height})")
+                    raise ValueError("Corrupted image with zero dimension.")
                 
                 imgs.append(image_transform(pil_image))
             except Exception as e:
-                item_index = examples['index'][i] if 'index' in examples else f"#{i} in batch"
+                item_index = examples.get('index', [f"#{i} in batch"])[i]
                 logger.warning(f"Error processing image with index {item_index}: {e}. Using a placeholder.")
                 imgs.append(placeholder_tensor)
 
         examples["pixel_values"] = imgs
 
-        # --- NEW: Text Handling for PRE-TOKENIZED Data ---
-        # This logic correctly handles lists of token IDs.
-        
-        # We need the tokenizer just for its special token IDs.
+        # Text Handling for Pre-Tokenized Data
         eos_token_id = tokenizer.eos_token_id
         if eos_token_id is None:
             raise ValueError("Tokenizer must have an EOS token defined for Causal LM pretraining.")
 
         processed_input_ids = []
         for token_ids in examples[text_column]:
-            # Create a mutable copy to work with.
             current_ids = list(token_ids)
 
-            # 1. Sanitize: Remove any pre-existing EOS token to prevent duplication.
-            #    This makes the function robust even if some data already has an EOS.
             if current_ids and current_ids[-1] == eos_token_id:
                 current_ids.pop()
             
-            # 2. Truncate: Trim the sequence to make space for the new EOS token.
-            #    We truncate to max_seq_length - 1.
             if len(current_ids) > max_seq_length - 1:
                 current_ids = current_ids[:max_seq_length - 1]
             
-            # 3. Terminate: Append the definitive EOS token.
-            #    Now the sequence is guaranteed to be <= max_seq_length and end with EOS.
             current_ids.append(eos_token_id)
-            
             processed_input_ids.append(current_ids)
         
         examples["input_ids"] = processed_input_ids
@@ -283,7 +267,6 @@ def make_preprocess_fn(tokenizer, image_column, text_column, max_seq_length, ima
 # Main flow
 # -------------------------
 def main():
-    # torch.autograd.set_detect_anomaly(True) # FOR DEBUGGING ONLY
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, CustomTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -292,45 +275,42 @@ def main():
     logger.info(f"Data args: {data_args}")
     logger.info(f"Training args: {training_args}")
 
-    set_seed(training_args.seed) # default to 42
+    set_seed(training_args.seed)
 
     logger.info(f"Loading tokenizer from: {model_args.tokenizer_path}")
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_path)
 
-    # # Ensure PAD token exists (same across ranks)
-    # if tokenizer.pad_token is None:
-    #     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-
-    # --- synchronize tokenizer across all processes ---
-    # I think this is the cause of the vocab size missmatch.
     if torch.distributed.is_initialized():
         if torch.distributed.get_rank() == 0:
             tokenizer.save_pretrained(training_args.output_dir)
         torch.distributed.barrier()
         tokenizer = AutoTokenizer.from_pretrained(training_args.output_dir)
-    # ---------------------------------------------------
 
+    logger.info(f"Loading base model weights from '{model_args.model_name_or_path}'")
+    model = ErniePixelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
-    if model_args.model_name_or_path:
-        logger.info(f"Loading model from {model_args.model_name_or_path}")
-        config = ErniePixelConfig.from_pretrained(model_args.model_name_or_path)
-        model = ErniePixelForCausalLM.from_pretrained(model_args.model_name_or_path, config=config)
-    else:
-        logger.info("Initializing a new model from scratch.")
-        config = ErniePixelConfig(
-            vocab_size=len(tokenizer),
-            pad_token_id=tokenizer.pad_token_id,
-            hidden_size=model_args.hidden_size,
-            intermediate_size=model_args.intermediate_size,
-            num_hidden_layers=model_args.num_hidden_layers,
-            num_attention_heads=model_args.num_attention_heads,
-            image_size=model_args.image_size,
-            patch_size=model_args.patch_size,
-            num_channels=model_args.num_channels,
-            rms_norm_eps=1e-6,
+    original_vocab_size = model.config.vocab_size
+    new_vocab_size = len(tokenizer)
+
+    if original_vocab_size != new_vocab_size:
+        logger.warning(
+            f"Vocabulary size mismatch detected. Base model vocab: {original_vocab_size}, New tokenizer vocab: {new_vocab_size}."
         )
-        model = ErniePixelForCausalLM(config)
-        # model.resize_token_embeddings(len(tokenizer)) -- Redundant.
+        logger.info("Performing a cold start: resizing the model's token embeddings...")
+        
+        # --- THE CRITICAL FIX ---
+        # Re-set the seed right before the random initialization. This guarantees
+        # that every process (on every GPU) generates the exact same random weights.
+        set_seed(training_args.seed)
+        
+        model.resize_token_embeddings(new_vocab_size)
+        
+        if tokenizer.pad_token_id is not None:
+            model.config.pad_token_id = tokenizer.pad_token_id
+            
+        logger.info(f"Model token embeddings resized to {new_vocab_size}.")
+    else:
+        logger.info("Vocabulary sizes match. No resizing is necessary.")
 
     model.gradient_checkpointing_disable()
     if hasattr(model.config, "use_cache"):
@@ -348,14 +328,13 @@ def main():
         data_args.image_column,
         data_args.text_column,
         data_args.max_seq_length,
-        model_args.image_size,
-        model_args.num_channels,
+        model.config.image_size,
+        model.config.num_channels,
     )
-
     ds.set_transform(preprocess_fn)
 
     from functools import partial
-    data_collator = partial(collate_fn, tokenizer=tokenizer, patch_size=model_args.patch_size)
+    data_collator = partial(collate_fn, tokenizer=tokenizer, patch_size=model.config.patch_size)
 
     if training_args.base_learning_rate:
         total_train_batch_size = (
@@ -377,7 +356,7 @@ def main():
         callbacks=[checkpoint_cb],
     )
 
-    last_checkpoint = get_last_checkpoint(training_args.output_dir) if os.path.isdir(training_args.output_dir) else None
+    last_checkpoint = get_last_checkpoint(training_args.output_dir)
     if last_checkpoint:
         logger.info(f"Resuming from checkpoint: {last_checkpoint}")
 
@@ -391,6 +370,7 @@ def main():
     trainer.save_state()
 
     logger.info("Training finished.")
+
 
 if __name__ == "__main__":
     main()

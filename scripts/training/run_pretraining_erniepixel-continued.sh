@@ -11,19 +11,20 @@
 #$ -l gpus=2                                     # Request 4 GPUs on a single node. The scheduler will set CUDA_VISIBLE_DEVICES.
 #$ -pe omp 2
 #$ -l gpu_type=A40                               # Request specific GPU type
-#$ -l h_rt=24:00:00                              # Request 24 hours of runtime
-#$ -N OneGPUPerCore__FourGPU_DualGPT_java_pretrain                      # Job name
+#$ -l h_rt=36:00:00                              # Request 24 hours of runtime
+#$ -N ZeroWidth_ColdStart_Pretrain_Java                      # Job name
 #$ -j y                                          # Join stdout and stderr
-#$ -o 1Core_1GPU_dualgpt_pretrain_$JOB_ID.log               # Specify the log file name
+#$ -o ZeroWidth_ColdStart_Pretrain_Java.log               # Specify the log file name
 
 # --- Paths ---
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/scripts/training"
 VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"
-DATASET_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-poc/default/0.0.0"
+DATASET_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-poc-2/default/0.0.0"
 TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
 CACHE_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache"
-OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/pretraining"
+OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/continous-zerowhitespace-coldstart-pretraining"
 PYTHON_SCRIPT_NAME="run_pretraining_erniepixel.py" 
+MODEL_PATH = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/models/dualGPT-vocabResize"
 
 # --- Dataset Arguments ---
 IMAGE_COLUMN="pixel_values"
@@ -109,8 +110,8 @@ export NCCL_IB_DISABLE=1
 # CUDA_VISIBLE_DEVICES environment variable set by the qsub scheduler.
 echo "Starting pretraining job... Accelerate will auto-detect the number of GPUs."
 accelerate launch --main_process_port 29700 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}" \
+    --model_name_or_path "${MODEL_PATH}" \
     --dataset_name "${DATASET_PATH}" \
-    --tokenizer_path "${TOKENIZER_PATH}" \
     --image_column "${IMAGE_COLUMN}" \
     --text_column "${TEXT_COLUMN}" \
     --output_dir "${OUTPUT_DIR}" \
