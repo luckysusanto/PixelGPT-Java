@@ -15,6 +15,9 @@ wandb/
 __pycache__/
 *.py[cod]
 *$py.class
+*.o*
+*.e*
+scripts/training/*output/
 
 # C extensions
 *.so
