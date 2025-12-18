@@ -18,7 +18,7 @@ __pycache__/
 *.o*
 *.e*
 scripts/training/*output/
-
+_updated_experiment_output/
 # C extensions
 *.so
 
