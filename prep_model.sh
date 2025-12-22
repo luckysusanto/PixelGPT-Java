@@ -8,7 +8,7 @@
 
 # --- Paths ---
 # The original pretrained model from the Hugging Face Hub
-export BASE_MODEL="ernie-research/DualGPT"
+export BASE_MODEL="hf_cache/models/DualGPT-vocabResize"
 
 # Your custom tokenizer from the Hugging Face Hub or a local path
 export TOKENIZER_PATH="izzako/javanese-llama-tokenizer"

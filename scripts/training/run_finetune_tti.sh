@@ -9,9 +9,9 @@
 #$ -pe omp 2
 #$ -l gpu_type=A40
 #$ -l h_rt=24:00:00
-#$ -N DualGPT_Finetune_Translit
+#$ -N DualGPT_Finetune_Tti
 #$ -j y
-#$ -o DualGPT_Finetune_$JOB_ID.log
+#$ -o DualGPT_Finetune_Tti$JOB_ID.log
 
 # --- Paths ---
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/scripts/training"
@@ -19,10 +19,10 @@ VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"
 CACHE_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache"
 
 # Output for the Fine-tuned model
-OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/finetune_transliteration"
+OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/finetune_imageGen"
 
 # Save the python code from the previous answer as this filename:
-PYTHON_SCRIPT_NAME="run_finetune.py" 
+PYTHON_SCRIPT_NAME="run_finetune_tti.py" 
 TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
 
 # --- MODEL ARGUMENTS ---
@@ -44,7 +44,7 @@ TEXT_COLUMN="token_ids"
 PER_DEVICE_BATCH_SIZE=4
 GRADIENT_ACCUMULATION_STEPS=2
 LEARNING_RATE=2e-5
-NUM_EPOCHS=5
+NUM_EPOCHS=3
 DATALOADER_WORKERS=0
 
 # --- Logging ---
