@@ -3,21 +3,20 @@
 # =============================================================================
 # 1. ASSIGNMENT CONFIGURATION (CHANGE THIS PER PERSON)
 # =============================================================================
-ASSIGNED_TOKENIZER="grapheme" 
+ASSIGNED_TOKENIZER="mt5" 
 
 # =============================================================================
 # 2. PATHS SETUP
 # =============================================================================
-PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
+PROJECT_DIR="/workspace/pixel/PixelGPT-Java/"
 MODELS_ROOT="${PROJECT_DIR}/hf_cache_updated/models"
 OUTPUT_ROOT="${PROJECT_DIR}/rebuttal_experiment_output/DEBUG_TEST-${ASSIGNED_TOKENIZER}"
 JOB_SCRIPT="${PROJECT_DIR}/rebuttal_scripts/b2-pretrain_worker.sh"
 
-DATASET_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-balinese-pixelgpt/default/0.0.0/4a31992e9daac65666bc3a814085bc8e48352210"
-DATASET_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-javanese-pixelgpt/default/0.0.0/c5fef00960c24c242eeb63befca570f18c1b3ec7"
-DATASET_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-lampung-pixelgpt/default/0.0.0/efac497f7298c8234298699767f8f46db161eb73"
-DATASET_SUNDA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-sundanese-pixelgpt/default/0.0.0/dcd6ec05b35e3845faf930e710924114233c6f55"
-DATASET_BALI_PURE="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-pure_bali-grapheme_experiment_only/default/0.0.0/97c9a64ef822783fe211834f590bc8e2c3a02b08"
+DATASET_BALI="/workspace/pixel/PixelGPT-Java/hf_cache_updated/datasets/Exqrch___rebuttal-balinese-pixelgpt/default/0.0.0/4a31992e9daac65666bc3a814085bc8e48352210"
+DATASET_JAVA="/workspace/pixel/PixelGPT-Java/hf_cache_updated/datasets/Exqrch___rebuttal-javanese-pixelgpt/default/0.0.0/c5fef00960c24c242eeb63befca570f18c1b3ec7"
+DATASET_LAMPUNG="/workspace/pixel/PixelGPT-Java/hf_cache_updated/datasets/Exqrch___rebuttal-lampung-pixelgpt/default/0.0.0/efac497f7298c8234298699767f8f46db161eb73"
+DATASET_SUNDA="/workspace/pixel/PixelGPT-Java/hf_cache_updated/datasets/Exqrch___rebuttal-sundanese-pixelgpt/default/0.0.0/dcd6ec05b35e3845faf930e710924114233c6f55"
 
 # Tokenizer Constants
 TOK_JAVA="izzako/javanese-llama-tokenizer"

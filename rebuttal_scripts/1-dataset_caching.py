@@ -12,7 +12,7 @@ print("Authenticating with Hugging Face...")
 login(token=hf_token)
 
 # 1. Define your custom cache directory
-CACHE_DIR = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets"
+CACHE_DIR = "/workspace/pixel/PixelGPT-Java/hf_cache_updated/datasets"
 
 # Ensure the directory exists
 os.makedirs(CACHE_DIR, exist_ok=True)

@@ -5,9 +5,9 @@
 #$ -l h_rt=25:00:00
 #$ -j y
 
-PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
+PROJECT_DIR="/workspace/pixel/PixelGPT-Java/"
 SCRIPT_PATH="${PROJECT_DIR}/rebuttal_scripts/pretrain_erniepixel.py"
-VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env"
+VENV_PATH="/workspace/pixel/PixelGPT-Java/pixelgpt"
 CACHE_DIR="${PROJECT_DIR}/hf_cache_updated"
 
 source "${VENV_PATH}/bin/activate"
