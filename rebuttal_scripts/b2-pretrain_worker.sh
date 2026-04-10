@@ -2,7 +2,7 @@
 #$ -pe omp 4
 #$ -l gpus=2
 #$ -l gpu_type=A40
-#$ -l h_rt=01:00:00
+#$ -l h_rt=25:00:00
 #$ -j y
 
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
@@ -25,8 +25,8 @@ echo "=========================================================="
 accelerate launch --main_process_port "$PORT" --num_processes 2 "$SCRIPT_PATH" \
     --model_name_or_path "$MODEL_PATH" \
     --tokenizer_path "$TOK_PATH" \
-    --dataset_a_name "$DA" \
-    ${DB:+--dataset_b_name "$DB"} \
+    --dataset_a_name "$DS_A" \
+    ${DS_B:+--dataset_b_name "$DS_B"} \
     --output_dir "$OUTPUT_DIR" \
     --text_column "$TEXT_COL" \
     --run_name "$RUN_NAME"

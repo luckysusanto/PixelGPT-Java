@@ -75,8 +75,9 @@ if [ "$ASSIGNED_TOKENIZER" == "grapheme" ]; then
     # 1. Javanese Mono
     submit_exp "DEBUG-mono_javanese" "${DATASET_JAVA}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
     
-    # 2. Balinese Mono (PURE BALI)
-    submit_exp "DEBUG-mono_balinese" "${DATASET_BALI_PURE}" "" "dualGPT-vocabResize-bali-grapheme" "${TOK_BALI}"
+    # 2. Balinese Mono & Pure Bali Mono
+    submit_exp "DEBUG-mono_balinese" "${DATASET_BALI}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
+    submit_exp "DEBUG-mono_pure-balinese" "${DATASET_BALI_PURE}" "" "dualGPT-vocabResize-bali-grapheme" "${TOK_BALI}"
     
     # 3. Sundanese Mono
     submit_exp "DEBUG-mono_sundanese" "${DATASET_SUNDA}" "" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
