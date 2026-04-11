@@ -4,6 +4,7 @@ import time
 import sys
 import gc
 import datetime
+import math
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from PIL import Image
@@ -210,10 +211,6 @@ class StratifiedDistributedSampler(Sampler):
     def __len__(self): return self.num_samples
     def set_epoch(self, epoch): self.epoch = epoch
 
-# --- FIX APPLIED: create float32 patches mapped to 1.0 ---
-def create_white_patch(patch_size: int, num_channels: int) -> torch.Tensor:
-    """Create a white patch (1.0 in all channels) for padding."""
-    return torch.ones((num_channels, patch_size, patch_size), dtype=torch.float32)
 
 @dataclass
 class SmartMultimodalCollator:
@@ -223,15 +220,11 @@ class SmartMultimodalCollator:
     num_channels: int
 
     def __call__(self, batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        has_pixel = any(b['pixel_values'] is not None for b in batch)
-        has_text = any(b['input_ids'] is not None for b in batch)
+        has_pixel = any(b.get('pixel_values') is not None for b in batch)
+        has_text = any(b.get('input_ids') is not None for b in batch)
         batch_out = {}
 
         if has_pixel:
-            pixel_list = []
-            pixel_mask_list = []
-            
-            # --- FIX APPLIED: Minibatch Dynamic Width ---
             max_width = 0
             for item in batch:
                 if item.get('pixel_values') is not None:
@@ -241,49 +234,31 @@ class SmartMultimodalCollator:
             max_width = min(max_width, self.image_size[1])
             if max_width == 0: max_width = self.patch_size # safe fallback
             
-            white_patch = create_white_patch(self.patch_size, self.num_channels)
+            bsz = len(batch)
+            height = self.image_size[0]
             
-            for item in batch:
+            # Pre-allocate batch with 1.0s (white pixels)
+            pixel_batch = torch.ones((bsz, self.num_channels, height, max_width), dtype=torch.float32)
+            
+            # Calculate max patches for the attention mask
+            num_patches = (height // self.patch_size) * (max_width // self.patch_size)
+            pixel_mask_batch = torch.zeros((bsz, num_patches), dtype=torch.long)
+            
+            for i, item in enumerate(batch):
                 if item.get('pixel_values') is not None:
                     pixels = item['pixel_values']
-                    current_width = pixels.shape[2]
+                    current_width = min(pixels.shape[2], max_width)
                     
-                    # Ensure width doesn't exceed global config max
-                    if current_width > max_width:
-                        pixels = pixels[:, :, :max_width]
-                        current_width = max_width
-                    
-                    if current_width < max_width:
-                        # Pad width with white patches
-                        padding_width = max_width - current_width
-                        num_white_patches = padding_width // self.patch_size
-                        
-                        if num_white_patches > 0:
-                            white_padding = white_patch.repeat(1, 1, num_white_patches)
-                            pixels = torch.cat([pixels, white_padding], dim=2)
-                    
-                    pixel_list.append(pixels)
+                    # Copy image data directly into the pre-allocated white tensor
+                    pixel_batch[i, :, :, :current_width] = pixels[:, :, :current_width]
                     
                     # Create pixel attention mask
-                    h, w = pixels.shape[1], pixels.shape[2]
-                    num_patches = (h // self.patch_size) * (w // self.patch_size)
-                    
-                    original_width = min(item['pixel_values'].shape[2], max_width)
-                    original_patches = (h // self.patch_size) * (original_width // self.patch_size)
-                    
-                    mask = torch.zeros(num_patches, dtype=torch.long)
-                    mask[:original_patches] = 1
-                    pixel_mask_list.append(mask)
-                else:
-                    # --- FIX APPLIED: Float32 placeholder initialized to 1.0 ---
-                    placeholder_img = torch.ones((self.num_channels, self.image_size[0], max_width), 
-                                                dtype=torch.float32)
-                    pixel_list.append(placeholder_img)
-                    num_patches = (self.image_size[0] // self.patch_size) * (max_width // self.patch_size)
-                    pixel_mask_list.append(torch.zeros(num_patches, dtype=torch.long))
+                    h = pixels.shape[1]
+                    original_patches = (h // self.patch_size) * (current_width // self.patch_size)
+                    pixel_mask_batch[i, :original_patches] = 1
             
-            batch_out['pixel_values'] = torch.stack(pixel_list)
-            batch_out['pixel_attention_mask'] = torch.stack(pixel_mask_list)
+            batch_out['pixel_values'] = pixel_batch
+            batch_out['pixel_attention_mask'] = pixel_mask_batch
 
         if has_text:
             input_ids_list = []
@@ -299,7 +274,6 @@ class SmartMultimodalCollator:
                     input_ids_list.append(torch.tensor([pad_id], dtype=torch.long))
                     labels_list.append(torch.tensor([-100], dtype=torch.long))
             
-            # --- Text padding aligns dynamically to the max length in minibatch ---
             batch_out['input_ids'] = pad_sequence(input_ids_list, batch_first=True, padding_value=pad_id)
             batch_out['labels'] = pad_sequence(labels_list, batch_first=True, padding_value=-100)
             
@@ -312,7 +286,6 @@ class SmartMultimodalCollator:
 
 def make_lazy_transform(tokenizer, image_col, text_col, max_len, image_size, num_channels):
     """Create lazy transform function for on-the-fly processing."""
-    # --- FIX APPLIED: Removed transforms.Resize to preserve dynamic lengths ---
     image_transform = transforms.Compose([
         transforms.ToTensor(), # Automatically scales 0-255 uint8 to 0.0-1.0 float32
     ])
@@ -489,6 +462,34 @@ def main():
             TensorBoardCopyCallback(output_dir=training_args.output_dir)
         ],
     )
+
+    # --- NEW LOGGING BLOCK START ---
+    if rank == 0:
+        # Calculate exactly how the DataLoaders/Trainer will split the data
+        samples_per_device = math.ceil(len(train_dataset) / world_size)
+        batches_per_device = math.ceil(samples_per_device / training_args.per_device_train_batch_size)
+        steps_per_epoch = math.ceil(batches_per_device / training_args.gradient_accumulation_steps)
+        total_steps = math.ceil(steps_per_epoch * training_args.num_train_epochs)
+        
+        effective_batch_size = (
+            training_args.per_device_train_batch_size * 
+            training_args.gradient_accumulation_steps * 
+            world_size
+        )
+        
+        rank_print("=" * 60)
+        rank_print("📊 DATASET & TRAINING METRICS 📊")
+        rank_print("=" * 60)
+        rank_print(f"1. Training Dataset Length : {len(train_dataset):,} samples")
+        rank_print(f"2. Eval Dataset Length     : {len(eval_dataset):,} samples")
+        rank_print(f"3. Effective Batch Size    : {effective_batch_size} samples/update")
+        rank_print(f"   - Per Device Batch Size : {training_args.per_device_train_batch_size}")
+        rank_print(f"   - Grad Accumulation     : {training_args.gradient_accumulation_steps}")
+        rank_print(f"   - World Size (GPUs)     : {world_size}")
+        rank_print(f"4. Expected Training Steps : ~{steps_per_epoch:,} steps/epoch")
+        rank_print(f"5. Total Training Steps    : ~{total_steps:,} steps (at {training_args.num_train_epochs} epochs)")
+        rank_print("=" * 60)
+    # --- NEW LOGGING BLOCK END ---
 
     trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     

@@ -3,16 +3,17 @@
 # =============================================================================
 # 1. ASSIGNMENT CONFIGURATION (CHANGE THIS PER PERSON)
 # =============================================================================
-ASSIGNED_TOKENIZER="grapheme" 
+ASSIGNED_TOKENIZER="grapheme" # Adapt this
 
 # =============================================================================
 # 2. PATHS SETUP
 # =============================================================================
-PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
+PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt" # Adapt this
 MODELS_ROOT="${PROJECT_DIR}/hf_cache_updated/models"
-OUTPUT_ROOT="${PROJECT_DIR}/rebuttal_experiment_output/DEBUG_TEST-${ASSIGNED_TOKENIZER}"
+OUTPUT_ROOT="${PROJECT_DIR}/rebuttal_experiment_output/${ASSIGNED_TOKENIZER}"
 JOB_SCRIPT="${PROJECT_DIR}/rebuttal_scripts/b2-pretrain_worker.sh"
 
+# Adapt these
 DATASET_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-balinese-pixelgpt/default/0.0.0/4a31992e9daac65666bc3a814085bc8e48352210"
 DATASET_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-javanese-pixelgpt/default/0.0.0/c5fef00960c24c242eeb63befca570f18c1b3ec7"
 DATASET_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated/datasets/Exqrch___rebuttal-lampung-pixelgpt/default/0.0.0/efac497f7298c8234298699767f8f46db161eb73"

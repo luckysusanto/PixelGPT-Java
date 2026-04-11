@@ -5,7 +5,7 @@ from huggingface_hub import login
 from transformers import AutoTokenizer
 
 # Add pixelgpt base to python
-PROJECT_ROOT = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
+PROJECT_ROOT = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt" # Adapt this
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
@@ -22,7 +22,7 @@ print("Authenticating with Hugging Face...")
 login(token=hf_token)
 
 # 2. Setup paths
-CACHE_DIR = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated"
+CACHE_DIR = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache_updated" # Adapt this
 os.environ["HF_HOME"] = CACHE_DIR # Protect your home directory!
 
 base_model_path = "ernie-research/DualGPT"
