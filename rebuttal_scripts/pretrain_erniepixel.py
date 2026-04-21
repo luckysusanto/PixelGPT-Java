@@ -39,9 +39,9 @@ HYPERPARAMETERS = {
     "image_size": [16, 16384],  # [height, max_width]
     "patch_size": 16,
     "num_channels": 3,
-    "per_device_train_batch_size": 4,
+    "per_device_train_batch_size": 1, # ori = 4
     "per_device_eval_batch_size": 4,
-    "gradient_accumulation_steps": 4,
+    "gradient_accumulation_steps": 16, # ori = 4
     "num_train_epochs": 10.0,
     "learning_rate": 5e-4,
     "weight_decay": 0.1,
@@ -49,8 +49,8 @@ HYPERPARAMETERS = {
     "warmup_steps": 1000,
     "save_strategy": "steps",
     "evaluation_strategy": "steps",
-    "save_steps": 1000,
-    "eval_steps": 1000,
+    "save_steps": 1000, # ori = 1000
+    "eval_steps": 1000, # ori = 1000
     "load_best_model_at_end": True,
     "save_total_limit": 2,
     "early_stopping_patience": 5,
@@ -61,7 +61,7 @@ HYPERPARAMETERS = {
     "validation_samples_per_dataset": 1000,
     "dataset_a_weight": 1.0,
     "dataset_b_weight": 1.0,
-    "max_training_time_hours": 24.0,
+    "max_training_time_hours": 47.5,
     "bf16": True,
     "dataloader_num_workers": 0,
     "remove_unused_columns": False,
@@ -75,7 +75,8 @@ HYPERPARAMETERS = {
 os.environ["HF_DATASETS_LOCKING_DISABLED"] = "true" 
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["NCCL_IB_DISABLE"] = "1"
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128,garbage_collection_threshold:0.6")
+# os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128,garbage_collection_threshold:0.6")
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128,garbage_collection_threshold:0.8"
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 torch.backends.cudnn.benchmark = False
 
@@ -177,6 +178,20 @@ class TensorBoardCopyCallback(TrainerCallback):
                         if os.path.exists(tb_logs_dst): shutil.rmtree(tb_logs_dst)
                         shutil.copytree(tb_logs_alt, tb_logs_dst)
                     except Exception as e: pass
+
+class MemoryCleanupCallback(TrainerCallback):
+    def on_evaluate(self, args, state, control, **kwargs):
+        gc.collect()
+        torch.cuda.empty_cache()
+    
+    def on_save(self, args, state, control, **kwargs):
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step % 500 == 0:
+            gc.collect()
+            torch.cuda.empty_cache()
 
 class StratifiedDistributedSampler(Sampler):
     def __init__(self, dataset, weights, num_replicas=None, rank=None, seed=42, shuffle=True):
@@ -459,7 +474,8 @@ def main():
         callbacks=[
             EarlyStoppingCallback(early_stopping_patience=5), 
             TimeLimitCallback(time_limit_hours=training_args.max_training_time_hours), 
-            TensorBoardCopyCallback(output_dir=training_args.output_dir)
+            TensorBoardCopyCallback(output_dir=training_args.output_dir),
+            MemoryCleanupCallback()
         ],
     )
 

@@ -3,7 +3,7 @@
 # =============================================================================
 # 1. ASSIGNMENT CONFIGURATION (CHANGE THIS PER PERSON)
 # =============================================================================
-ASSIGNED_TOKENIZER="grapheme" # Adapt this
+ASSIGNED_TOKENIZER="mt5" # Adapt this
 
 # =============================================================================
 # 2. PATHS SETUP
@@ -74,30 +74,30 @@ submit_exp() {
 
 if [ "$ASSIGNED_TOKENIZER" == "grapheme" ]; then
     # 1. Javanese Mono
-    submit_exp "DEBUG-mono_javanese" "${DATASET_JAVA}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
+    # submit_exp "DEBUG-mono_javanese" "${DATASET_JAVA}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
     
     # 2. Balinese Mono & Pure Bali Mono
-    submit_exp "DEBUG-mono_balinese" "${DATASET_BALI}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
-    submit_exp "DEBUG-mono_pure-balinese" "${DATASET_BALI_PURE}" "" "dualGPT-vocabResize-bali-grapheme" "${TOK_BALI}"
+    # submit_exp "DEBUG-mono_balinese" "${DATASET_BALI}" "" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
+    # submit_exp "DEBUG-mono_pure-balinese" "${DATASET_BALI_PURE}" "" "dualGPT-vocabResize-bali-grapheme" "${TOK_BALI}"
     
     # 3. Sundanese Mono
-    submit_exp "DEBUG-mono_sundanese" "${DATASET_SUNDA}" "" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
+    # submit_exp "DEBUG-mono_sundanese" "${DATASET_SUNDA}" "" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
     
     # 4. Lampung Mono
-    submit_exp "DEBUG-mono_lampung" "${DATASET_LAMPUNG}" "" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
+    # submit_exp "DEBUG-mono_lampung" "${DATASET_LAMPUNG}" "" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
     
     # 5. Dual Javanese + Balinese (Uses JAVA Tokenizer/Model)
     submit_exp "DEBUG-dual_java_bali" "${DATASET_JAVA}" "${DATASET_BALI}" "dualGPT-vocabResize-java-grapheme" "${TOK_JAVA}"
     
     # 6. Dual Sundanese + Lampung
-    submit_exp "DEBUG-dual_sunda_lampung" "${DATASET_SUNDA}" "${DATASET_LAMPUNG}" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
+    # submit_exp "DEBUG-dual_sunda_lampung" "${DATASET_SUNDA}" "${DATASET_LAMPUNG}" "dualGPT-vocabResize-sunda-grapheme" "${TOK_SUNDA}"
 
 else
     # STANDARD LOGIC (Llama2, Komodo, mT5) - TOK_PATH will default to TOK_BASE inside function
     submit_exp "mono_javanese"      "${DATASET_JAVA}" ""
-    submit_exp "mono_balinese"      "${DATASET_BALI}" ""
-    submit_exp "mono_sundanese"     "${DATASET_SUNDA}" ""
-    submit_exp "mono_lampung"       "${DATASET_LAMPUNG}" ""
+    # submit_exp "mono_balinese"      "${DATASET_BALI}" ""
+    # submit_exp "mono_sundanese"     "${DATASET_SUNDA}" ""
+    # submit_exp "mono_lampung"       "${DATASET_LAMPUNG}" ""
     submit_exp "dual_java_bali"     "${DATASET_JAVA}" "${DATASET_BALI}"
-    submit_exp "dual_sunda_lampung" "${DATASET_SUNDA}" "${DATASET_LAMPUNG}"
+    # submit_exp "dual_sunda_lampung" "${DATASET_SUNDA}" "${DATASET_LAMPUNG}"
 fi

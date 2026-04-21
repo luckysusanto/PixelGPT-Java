@@ -2,7 +2,7 @@
 #$ -pe omp 4
 #$ -l gpus=2
 #$ -l gpu_type=A40
-#$ -l h_rt=25:00:00
+#$ -l h_rt=48:00:00
 #$ -j y
 
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
