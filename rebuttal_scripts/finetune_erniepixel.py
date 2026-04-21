@@ -37,9 +37,9 @@ HYPERPARAMETERS = {
     "image_size": [16, 16384],  # [height, max_width]
     "patch_size": 16,
     "num_channels": 3,
-    "per_device_train_batch_size": 1,
+    "per_device_train_batch_size": 4, # PASTIKAN per_device_train_batch_size x gradient_accumulation_steps = 16
     "per_device_eval_batch_size": 4,
-    "gradient_accumulation_steps": 16,
+    "gradient_accumulation_steps": 4, # PASTIKAN per_device_train_batch_size x gradient_accumulation_steps = 16
     "num_train_epochs": 5.0,
     "learning_rate": 2e-5,
     "weight_decay": 0.1,
