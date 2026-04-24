@@ -94,10 +94,10 @@ if [ "$ASSIGNED_TOKENIZER" == "grapheme" ]; then
 
 else
     # STANDARD LOGIC (Llama2, Komodo, mT5) - TOK_PATH will default to TOK_BASE inside function
-    submit_exp "mono_javanese"      "${DATASET_JAVA}" ""
-    # submit_exp "mono_balinese"      "${DATASET_BALI}" ""
+    # submit_exp "mono_javanese-withLog"      "${DATASET_JAVA}" ""
+    # submit_exp "mono_balinese-withLog"      "${DATASET_BALI}" ""
     # submit_exp "mono_sundanese"     "${DATASET_SUNDA}" ""
     # submit_exp "mono_lampung"       "${DATASET_LAMPUNG}" ""
-    submit_exp "dual_java_bali"     "${DATASET_JAVA}" "${DATASET_BALI}"
+    submit_exp "dual_java_bali-withLog"     "${DATASET_JAVA}" "${DATASET_BALI}"
     # submit_exp "dual_sunda_lampung" "${DATASET_SUNDA}" "${DATASET_LAMPUNG}"
 fi

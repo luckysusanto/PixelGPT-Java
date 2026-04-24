@@ -4,6 +4,9 @@ import time
 import sys
 import gc
 import datetime
+import math
+import csv
+import atexit
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from PIL import Image
@@ -35,7 +38,7 @@ HYPERPARAMETERS = {
     "num_hidden_layers": 12,
     "num_attention_heads": 12,
     "image_size": [16, 16384],  # [height, max_width]
-    "patch_size": 16,l
+    "patch_size": 16,
     "num_channels": 3,
     "per_device_train_batch_size": 4, # PASTIKAN per_device_train_batch_size x gradient_accumulation_steps = 16
     "per_device_eval_batch_size": 4,
@@ -62,7 +65,7 @@ HYPERPARAMETERS = {
     "remove_unused_columns": False,
     "ddp_find_unused_parameters": True,
     "ddp_broadcast_buffers": False,
-    "max_training_time_hours": 47.5,  
+    "max_training_time_hours": 47.5,
 }
 
 # =============================================================================
@@ -82,6 +85,105 @@ def rank_print(msg):
         rank = 0
     ts = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[NO-BARRIER | RANK {rank} | {ts}] {msg}", flush=True)
+
+
+# =============================================================================
+# LOGGING UTILITIES
+# =============================================================================
+class BatchTokenLogger:
+    """Logs per-micro-batch token-length stats to CSV with crash-safe flushing.
+
+    Each row = one collator call (one micro-batch on this rank).
+    `effective_step` = micro_step // grad_accum_steps, so you can group later.
+    Opened with line buffering + flush-per-row + atexit close so OOM preserves all data.
+    """
+    def __init__(self, csv_path: str, grad_accum_steps: int, rank: int, world_size: int):
+        base, ext = os.path.splitext(csv_path)
+        self.csv_path = f"{base}_rank{rank}{ext or '.csv'}"
+        self.grad_accum_steps = max(1, grad_accum_steps)
+        self.rank = rank
+        self.world_size = world_size
+        self.micro_step = 0
+        self.fh = None
+        self.writer = None
+        os.makedirs(os.path.dirname(self.csv_path), exist_ok=True)
+        self.fh = open(self.csv_path, "w", newline="", buffering=1)
+        self.writer = csv.writer(self.fh)
+        self.writer.writerow([
+            "micro_step", "effective_step", "batch_size",
+            "token_min", "token_max", "token_avg",
+            "pixel_width_min", "pixel_width_max", "pixel_width_avg",
+            "wall_time", "gpu_mem_alloc_gb", "gpu_mem_reserved_gb",
+        ])
+        self.fh.flush()
+        atexit.register(self.close)
+
+    def log(self, input_ids_lengths: List[int], pixel_widths: List[int], batch_size: int):
+        if self.writer is None:
+            self.micro_step += 1
+            return
+        eff_step = self.micro_step // self.grad_accum_steps
+        tl = input_ids_lengths if input_ids_lengths else [0]
+        pw = pixel_widths if pixel_widths else [0]
+        wall = datetime.datetime.now().isoformat(timespec="microseconds")
+        try:
+            mem_alloc_gb = round(torch.cuda.memory_allocated() / (1024 ** 3), 3)
+            mem_reserved_gb = round(torch.cuda.memory_reserved() / (1024 ** 3), 3)
+        except Exception:
+            mem_alloc_gb = -1.0
+            mem_reserved_gb = -1.0
+        self.writer.writerow([
+            self.micro_step,
+            eff_step,
+            batch_size,
+            min(tl), max(tl), round(sum(tl) / len(tl), 2),
+            min(pw), max(pw), round(sum(pw) / len(pw), 2),
+            wall, mem_alloc_gb, mem_reserved_gb,
+        ])
+        self.fh.flush()
+        try:
+            os.fsync(self.fh.fileno())
+        except Exception:
+            pass
+        self.micro_step += 1
+
+    def close(self):
+        if self.fh is not None:
+            try:
+                self.fh.flush()
+                self.fh.close()
+            except Exception:
+                pass
+            self.fh = None
+
+
+def compute_token_length_stats(dataset, text_column: str, label: str):
+    """Compute min/max/avg/percentile token length over a HF dataset.
+
+    Accesses the raw column directly to avoid triggering set_transform.
+    """
+    col = dataset[text_column]
+    lengths = []
+    for ids in col:
+        if ids is None:
+            continue
+        lengths.append(len(ids))
+    if not lengths:
+        rank_print(f"[TOKEN STATS | {label}] No samples with '{text_column}' found.")
+        return
+    n = len(lengths)
+    mn = min(lengths)
+    mx = max(lengths)
+    avg = sum(lengths) / n
+    arr = np.array(lengths)
+    p50 = float(np.percentile(arr, 50))
+    p95 = float(np.percentile(arr, 95))
+    p99 = float(np.percentile(arr, 99))
+    rank_print(
+        f"[TOKEN STATS | {label}] n={n:,} | min={mn} | max={mx} | avg={avg:.2f} "
+        f"| p50={p50:.0f} | p95={p95:.0f} | p99={p99:.0f}"
+    )
+
 
 @dataclass
 class ModelArguments:
@@ -172,7 +274,6 @@ class TensorBoardCopyCallback(TrainerCallback):
                         shutil.copytree(tb_logs_alt, tb_logs_dst)
                     except Exception as e: pass
 
-# FIX: Added MemoryCleanupCallback (present in pretraining, was missing here)
 class MemoryCleanupCallback(TrainerCallback):
     def on_evaluate(self, args, state, control, **kwargs):
         gc.collect()
@@ -197,11 +298,17 @@ class TransliterationCollator:
     patch_size: int
     image_size: List[int]
     num_channels: int
+    # Optional logger; None => no logging overhead
+    batch_logger: Optional[BatchTokenLogger] = None
 
     def __call__(self, batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         has_pixel = any(b['pixel_values'] is not None for b in batch)
         has_text = any(b['input_ids'] is not None for b in batch)
         batch_out = {}
+
+        # Collect per-sample stats for logging
+        _per_sample_token_lens: List[int] = []
+        _per_sample_pixel_widths: List[int] = []
 
         if has_pixel:
             pixel_list = []
@@ -221,8 +328,8 @@ class TransliterationCollator:
                 if item.get('pixel_values') is not None:
                     pixels = item['pixel_values']
 
-                    # FIX: Save original_width BEFORE any modification to pixels
                     original_width = min(pixels.shape[2], max_width)
+                    _per_sample_pixel_widths.append(int(pixels.shape[2]))  # log pre-cap width
 
                     if pixels.shape[2] > max_width:
                         pixels = pixels[:, :, :max_width]
@@ -232,8 +339,6 @@ class TransliterationCollator:
                     if current_width < max_width:
                         padding_width = max_width - current_width
                         num_white_patches = padding_width // self.patch_size
-                        # FIX: Guard against non-patch-aligned widths (should not happen
-                        # given perfect renderer, but avoids silent shape bugs)
                         assert padding_width % self.patch_size == 0, (
                             f"padding_width {padding_width} is not divisible by patch_size {self.patch_size}"
                         )
@@ -272,6 +377,7 @@ class TransliterationCollator:
                     txt = torch.tensor(item['input_ids'], dtype=torch.long)
                     input_ids_list.append(txt)
                     labels_list.append(txt.clone())
+                    _per_sample_token_lens.append(int(txt.shape[0]))  # log token lengths
                 else:
                     input_ids_list.append(torch.tensor([pad_id], dtype=torch.long))
                     labels_list.append(torch.tensor([-100], dtype=torch.long))
@@ -283,6 +389,14 @@ class TransliterationCollator:
             for i, item in enumerate(batch):
                 if item.get('input_ids') is None: text_mask[i] = 0
             batch_out['attention_mask'] = text_mask
+
+        # Flush one row per micro-batch
+        if self.batch_logger is not None:
+            self.batch_logger.log(
+                input_ids_lengths=_per_sample_token_lens,
+                pixel_widths=_per_sample_pixel_widths,
+                batch_size=len(batch),
+            )
 
         return batch_out
 
@@ -348,8 +462,6 @@ def main():
     training_args.remove_unused_columns = False
     set_seed(training_args.seed)
 
-    # FIX: Always load tokenizer from checkpoint for guaranteed consistency.
-    # model_name_or_path is mandatory in finetuning, so this is always well-defined.
     rank_print(f"Loading Tokenizer from checkpoint: {model_args.model_name_or_path}...")
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if tokenizer.pad_token is None: tokenizer.add_special_tokens({'pad_token': '[PAD]'})
@@ -366,8 +478,6 @@ def main():
     model.gradient_checkpointing_disable()
     if hasattr(model.config, "use_cache"): model.config.use_cache = False
 
-    # lm_pixel_head still exists in memory but is never used during finetuning.
-    # Freeze it to prevent any accidental gradient flow and reduce optimizer state.
     rank_print("Freezing lm_pixel_head...")
     if hasattr(model, 'lm_pixel_head'):
         for param in model.lm_pixel_head.parameters():
@@ -375,8 +485,6 @@ def main():
 
     rank_print("Loading Datasets...")
 
-    # FIX: Removed vestigial 'mode' column from features and prepare_single_dataset.
-    # The finetuning transform never uses it.
     common_features = Features({
         "pixel_values": Sequence(Sequence(Value("uint8"))),
         data_args.text_column: Sequence(Value("int64")),
@@ -413,11 +521,27 @@ def main():
         datasets_to_merge_train.append(train_b)
         datasets_to_merge_val.append(val_b)
 
+    # Compute token-length stats per dataset BEFORE concatenation/set_transform
+    if rank == 0:
+        rank_print("=" * 60)
+        rank_print("📏 TOKEN LENGTH STATISTICS (pre-concat) 📏")
+        rank_print("=" * 60)
+        compute_token_length_stats(train_a, data_args.text_column, f"TRAIN-A ({data_args.dataset_a_name})")
+        compute_token_length_stats(val_a, data_args.text_column, f"VAL-A ({data_args.dataset_a_name})")
+        if data_args.dataset_b_name:
+            compute_token_length_stats(train_b, data_args.text_column, f"TRAIN-B ({data_args.dataset_b_name})")
+            compute_token_length_stats(val_b, data_args.text_column, f"VAL-B ({data_args.dataset_b_name})")
+        rank_print("=" * 60)
+
     rank_print("Concatenating datasets...")
     train_dataset = concatenate_datasets(datasets_to_merge_train)
     eval_dataset = concatenate_datasets(datasets_to_merge_val)
 
-    rank_print(f"Dataset Ready. Train: {len(train_dataset)} | Val: {len(eval_dataset)}")
+    # Combined stats on the merged dataset
+    if rank == 0:
+        compute_token_length_stats(train_dataset, data_args.text_column, "TRAIN-MERGED")
+        compute_token_length_stats(eval_dataset, data_args.text_column, "VAL-MERGED")
+        rank_print("=" * 60)
 
     transform_fn = make_finetune_transform(
         tokenizer,
@@ -430,11 +554,22 @@ def main():
     train_dataset.set_transform(transform_fn)
     eval_dataset.set_transform(transform_fn)
 
+    # Per-batch CSV logger (per-rank file: batch_token_stats_rank{N}.csv)
+    csv_path = os.path.join(training_args.output_dir, "batch_token_stats.csv")
+    batch_logger = BatchTokenLogger(
+        csv_path=csv_path,
+        grad_accum_steps=training_args.gradient_accumulation_steps,
+        rank=rank,
+        world_size=world_size,
+    )
+    rank_print(f"📝 Per-micro-batch stats (rank {rank}) streaming to: {batch_logger.csv_path}")
+
     data_collator = TransliterationCollator(
         tokenizer=tokenizer,
         patch_size=model_args.patch_size,
         image_size=model_args.image_size,
-        num_channels=model_args.num_channels
+        num_channels=model_args.num_channels,
+        batch_logger=batch_logger,  # pass logger into collator
     )
 
     trainer = Trainer(
@@ -448,12 +583,42 @@ def main():
             EarlyStoppingCallback(early_stopping_patience=HYPERPARAMETERS["early_stopping_patience"]),
             TimeLimitCallback(time_limit_hours=training_args.max_training_time_hours),
             TensorBoardCopyCallback(output_dir=training_args.output_dir),
-            MemoryCleanupCallback(),  # FIX: added, was missing
+            MemoryCleanupCallback(),
         ],
     )
 
+    # Dataset & training metrics summary
+    if rank == 0:
+        samples_per_device = math.ceil(len(train_dataset) / world_size)
+        batches_per_device = math.ceil(samples_per_device / training_args.per_device_train_batch_size)
+        steps_per_epoch = math.ceil(batches_per_device / training_args.gradient_accumulation_steps)
+        total_steps = math.ceil(steps_per_epoch * training_args.num_train_epochs)
+
+        effective_batch_size = (
+            training_args.per_device_train_batch_size *
+            training_args.gradient_accumulation_steps *
+            world_size
+        )
+
+        rank_print("=" * 60)
+        rank_print("📊 DATASET & TRAINING METRICS 📊")
+        rank_print("=" * 60)
+        rank_print(f"1. Training Dataset Length : {len(train_dataset):,} samples")
+        rank_print(f"2. Eval Dataset Length     : {len(eval_dataset):,} samples")
+        rank_print(f"3. Effective Batch Size    : {effective_batch_size} samples/update")
+        rank_print(f"   - Per Device Batch Size : {training_args.per_device_train_batch_size}")
+        rank_print(f"   - Grad Accumulation     : {training_args.gradient_accumulation_steps}")
+        rank_print(f"   - World Size (GPUs)     : {world_size}")
+        rank_print(f"4. Expected Training Steps : ~{steps_per_epoch:,} steps/epoch")
+        rank_print(f"5. Total Training Steps    : ~{total_steps:,} steps (at {training_args.num_train_epochs} epochs)")
+        rank_print("=" * 60)
+
     rank_print("Starting Fine-Tuning...")
-    trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+    try:
+        trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+    finally:
+        # Ensure CSV is flushed/closed even on OOM
+        batch_logger.close()
 
     if rank == 0:
         rank_print("Saving Model...")

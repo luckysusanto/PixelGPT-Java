@@ -39,21 +39,21 @@ DATASET_BALI_PURE="${PROJECT_DIR}/hf_cache_updated/datasets/Exqrch___rebuttal-pu
 # -----------------------------------------------------------------------------
 
 # --- Shared tokenizers (llama2, komodo, mt5) ---
-PRETRAIN_BALI="PLACEHOLDER_pretrain_bali"
-PRETRAIN_JAVA="PLACEHOLDER_pretrain_java"
-PRETRAIN_LAMPUNG="PLACEHOLDER_pretrain_lampung"
-PRETRAIN_SUNDA="PLACEHOLDER_pretrain_sunda"
-PRETRAIN_DUAL_JAVA_BALI="PLACEHOLDER_pretrain_dual_java_bali"
-PRETRAIN_DUAL_SUNDA_LAMPUNG="PLACEHOLDER_pretrain_dual_sunda_lampung"
+PRETRAIN_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_balinese"
+PRETRAIN_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_javanese"
+PRETRAIN_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_lampung"
+PRETRAIN_SUNDA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_sundanese"
+PRETRAIN_DUAL_JAVA_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/dual_java_bali"
+PRETRAIN_DUAL_SUNDA_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/dual_sunda_lampung"
 
 # --- Grapheme-specific (separate model per script-aligned tokenizer) ---
-PRETRAIN_GRAPHEME_BALI_JAVA_TOK="PLACEHOLDER_pretrain_grapheme_bali_java-tok"
-PRETRAIN_GRAPHEME_BALI_BALI_TOK="PLACEHOLDER_pretrain_grapheme_bali_bali-tok"
-PRETRAIN_GRAPHEME_JAVA="PLACEHOLDER_pretrain_grapheme_java"
-PRETRAIN_GRAPHEME_LAMPUNG="PLACEHOLDER_pretrain_grapheme_lampung"
-PRETRAIN_GRAPHEME_SUNDA="PLACEHOLDER_pretrain_grapheme_sunda"
-PRETRAIN_GRAPHEME_DUAL_JAVA_BALI="PLACEHOLDER_pretrain_grapheme_dual_java_bali"
-PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG="PLACEHOLDER_pretrain_grapheme_dual_sunda_lampung"
+PRETRAIN_GRAPHEME_BALI_JAVA_TOK="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_balinese"
+PRETRAIN_GRAPHEME_BALI_BALI_TOK="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_pure-balinese"
+PRETRAIN_GRAPHEME_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_javanese"
+PRETRAIN_GRAPHEME_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_lampung"
+PRETRAIN_GRAPHEME_SUNDA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_sundanese"
+PRETRAIN_GRAPHEME_DUAL_JAVA_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-dual_java_bali"
+PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-dual_sunda_lampung"
 
 # -----------------------------------------------------------------------------
 # Tokenizer Constants

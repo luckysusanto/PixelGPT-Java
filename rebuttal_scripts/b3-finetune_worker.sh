@@ -1,8 +1,9 @@
 #!/bin/bash
 #$ -pe omp 4
 #$ -l gpus=2
-#$ -l gpu_type=A40
-#$ -l h_rt=24:00:00
+#$ -l gpu_type=A100
+#$ -l gpu_memory=80G
+#$ -l h_rt=48:00:00
 #$ -j y
 
 # =============================================================================
@@ -22,7 +23,7 @@
 # =============================================================================
 
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt"
-SCRIPT_PATH="${PROJECT_DIR}/rebuttal_scripts/finetune_erniepixel.py"
+SCRIPT_PATH="${PROJECT_DIR}/rebuttal_scripts/finetune_erniepixel-withLog.py"
 VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env"
 CACHE_DIR="${PROJECT_DIR}/hf_cache_updated"
 
