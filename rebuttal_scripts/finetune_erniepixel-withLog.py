@@ -65,7 +65,7 @@ HYPERPARAMETERS = {
     "remove_unused_columns": False,
     "ddp_find_unused_parameters": True,
     "ddp_broadcast_buffers": False,
-    "max_training_time_hours": 47.5,
+    "max_training_time_hours": 24.0,
 }
 
 # =============================================================================

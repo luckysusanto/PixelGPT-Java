@@ -32,7 +32,7 @@ def process_parquet_to_dataset(filepath, custom_text_renderer, tokenizer, origin
     print(f'Processing {filepath}: {num_parts} parts')
     
     for i, row in enumerate(tqdm(df.itertuples(), total=len(df))):
-        pixel_encoding = custom_text_renderer(row.chunk_aksara)
+        pixel_encoding = custom_text_renderer(row.chunk_aksara) # "han"
         text_encoding = tokenizer.encode(row.tokenized_text, is_split_into_words=True)
         llama_text_encoding = original_tokenizer.encode(row.chunk_text)
         records.append({

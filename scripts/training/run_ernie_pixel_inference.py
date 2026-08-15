@@ -223,16 +223,16 @@ def inference_pipeline(model_path, tokenizer_path, output_dir, token_ids=None, p
 if __name__ == "__main__":
 
     CHKPTS = [
-        i for i in range(65500, 75500, 500)
+        12500, 25000, 37500
     ]
     CHKPTS = [str(c) for c in CHKPTS]
     mflag = False
 
     for chkpt in CHKPTS:
-        MODEL_PATH = f"/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/mixedPretrain/checkpoint-{chkpt}"
+        MODEL_PATH = f"/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/finetune_transliteration/checkpoint-{chkpt}"
         TOKENIZER_PATH = "izzako/javanese-llama-tokenizer"
         DATASET_PATH = "/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-poc-2/default/0.0.0"
-        OUTPUT_DIR = f"pretrain_infer_output/chpt{chkpt}-mixedPretrain"
+        OUTPUT_DIR = f"finetune_infer_output/chpt{chkpt}-itt"
         os.makedirs(OUTPUT_DIR, exist_ok=True)
 
         print("Loading a full sample from the dataset...")

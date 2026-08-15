@@ -10,9 +10,9 @@
 #$ -pe omp 4
 #$ -l gpu_type=A40
 #$ -l h_rt=26:00:00
-#$ -N DualGPT_Finetune_Translit
+#$ -N F_B-BO-CT
 #$ -j y
-#$ -o DualGPT_Finetune_Translit-$JOB_ID.log
+#$ -o F_B-BO-CT-$JOB_ID.log
 
 # --- Paths ---
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updatedScripts/train"
@@ -20,7 +20,7 @@ VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"
 CACHE_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache"
 
 # Output for the Fine-tuned model
-OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/DatasetDebug-Finetune"
+OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/Finetune_Bali-Bali_Only-Custom_Tokenizer"
 
 # The Python script we just created
 PYTHON_SCRIPT_NAME="finetune_transliteration_erniepixel.py" 
@@ -29,22 +29,24 @@ TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
 # --- MODEL ARGUMENTS ---
 # Point this to the output directory of your PRETRAINING job.
 # No need to pin it to certain checkpoint, the main folder is already BEST, unless you want latest checkpoint instead.
-PRETRAINED_MODEL_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/DatasetDebug-Pretrain"
+PRETRAINED_MODEL_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/Pretrain_Bali-Custom_Tokenizer"
 
 # --- DATASETS ---
 # Define your datasets here. 
-DATASET_A_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-debug/default/0.0.0"
+# DATASET_A_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt/default/0.0.0"
+DATASET_A_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___balinese-pixelgpt/default/0.0.0"
 
 # Optional: Leave empty string "" if not using a second dataset
 DATASET_B_PATH=""
+# DATASET_B_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___balinese-pixelgpt/default/0.0.0"
 
 # --- Dataset Columns ---
 IMAGE_COLUMN="pixel_values"
 TEXT_COLUMN="grapheme_token_ids"
 
 # --- Training Arguments ---
-PER_DEVICE_BATCH_SIZE=4
-GRADIENT_ACCUMULATION_STEPS=2
+PER_DEVICE_BATCH_SIZE=2
+GRADIENT_ACCUMULATION_STEPS=4
 LEARNING_RATE=2e-5
 NUM_EPOCHS=10  # High number, relying on Early Stopping to finish it
 DATALOADER_WORKERS=0 # Must be 0 to prevent hangs
@@ -93,10 +95,11 @@ echo "Loading weights from: ${PRETRAINED_MODEL_PATH}"
 CMD=(
     accelerate launch 
     --num_processes 4 
-    --main_process_port 29701 
+    --main_process_port 29711 
     "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}"
     --model_name_or_path "${PRETRAINED_MODEL_PATH}"
     --dataset_a_name "${DATASET_A_PATH}"
+    --dataset_b_name "${DATASET_B_PATH}"
     --tokenizer_path "${TOKENIZER_PATH}"
     --image_column "${IMAGE_COLUMN}"
     --text_column "${TEXT_COLUMN}"

@@ -3,7 +3,7 @@
     "dpi": 120,
     "font_color": "black",
     "font_file": "49e6dc219d1a1a1c9236acaf05a48b542002016a6dc877ee72baab085a84257b.3f28e7f4b38e1efe1b6da4a3732404c19d4c6a614ff32dce90a251e293d4ce58",
-    "font_size": 7,
+    "font_size": 6,
     "fonts_list": [
       "Apple Color Emoji",
       "C059",
@@ -214,7 +214,7 @@
       "Z003"
     ],
     "max_seq_length": 1024,
-    "pad_size": 3,
+    "pad_size": 0,
     "pixels_per_patch": 16,
     "rgb": true,
     "text_renderer_type": "TextRenderer"

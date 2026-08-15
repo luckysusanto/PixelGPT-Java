@@ -1,8 +1,0 @@
---- Starting dataset download to cache directory: /projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache ---
---- ✅ Dataset 'izzako/javanese-pixelgpt-poc' successfully downloaded to cache. ---
-DatasetDict({
-    train: Dataset({
-        features: ['text_id', 'chunk_id', 'pixel_values', 'token_ids'],
-        num_rows: 395000
-    })
-})

@@ -21,6 +21,7 @@ scripts/training/*output/
 _updated_experiment_output/
 rebuttal/
 rebuttal_experiment_output/
+hf_cache_updated/
 # C extensions
 *.so
 

@@ -17,7 +17,7 @@
 # =============================================================================
 # 1. ASSIGNMENT CONFIGURATION (CHANGE THIS PER PERSON / PER RUN)
 # =============================================================================
-ASSIGNED_TOKENIZER="grapheme"   # Options: "llama2", "komodo", "mt5", "grapheme"
+ASSIGNED_TOKENIZER="komodo"   # Options: "llama2", "komodo", "mt5", "grapheme"
 
 # =============================================================================
 # 2. PATHS SETUP — MUST MATCH finetune_master.sh

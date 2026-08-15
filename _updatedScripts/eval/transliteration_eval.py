@@ -35,11 +35,11 @@ class ModelArguments:
 @dataclass
 class DataArguments:
     # Dataset A (Required)
-    dataset_a_name: str = field(metadata={"help": "Path/Name of the first dataset."})
-    dataset_a_lang: str = field(metadata={"help": "Language code/Identifier for Dataset A (e.g., 'javanese'). Used for output filenames."})
+    dataset_a_name: str = field(metadata={"help": "HuggingFace Repo ID for Dataset A (e.g. 'user/repo')."})
+    dataset_a_lang: str = field(metadata={"help": "Language code/Identifier for Dataset A."})
     
     # Dataset B (Optional)
-    dataset_b_name: Optional[str] = field(default=None, metadata={"help": "Path/Name of the second dataset."})
+    dataset_b_name: Optional[str] = field(default=None, metadata={"help": "HuggingFace Repo ID for Dataset B."})
     dataset_b_lang: Optional[str] = field(default=None, metadata={"help": "Language code for Dataset B."})
     
     # Configuration
@@ -68,9 +68,15 @@ def evaluate_single_dataset(
     """
     logger.info(f"--- Processing Dataset: {lang_code} ({dataset_path}) ---")
     
-    # 1. Load Dataset
+    # 1. Load Dataset in Streaming Mode (No Caching)
     try:
-        dataset = load_dataset(dataset_path, split=data_args.eval_split, cache_dir=data_args.cache_dir)
+        # streaming=True prevents the 'Generating train split' local caching behavior
+        dataset = load_dataset(
+            dataset_path, 
+            split=data_args.eval_split, 
+            cache_dir=data_args.cache_dir,
+            streaming=True
+        )
         dataset = dataset.select_columns([data_args.image_column, data_args.text_column])
     except Exception as e:
         logger.error(f"Failed to load dataset {dataset_path}: {e}")
@@ -85,9 +91,10 @@ def evaluate_single_dataset(
     all_predictions = []
     all_references = []
 
-    logger.info(f"Starting inference on {len(dataset)} samples...")
+    logger.info("Starting streaming inference (Length unknown in streaming mode)...")
 
     # 3. Inference Loop
+    # We remove len(dataset) because IterableDatasets do not support it
     for item in tqdm(dataset, desc=f"Eval {lang_code}"):
         raw_image = item[data_args.image_column]
         reference_ids = item[data_args.text_column]
@@ -145,9 +152,12 @@ def evaluate_single_dataset(
         all_references.append(ref_text)
 
     # 4. Metrics
+    if not all_predictions:
+        logger.error(f"No samples processed for {lang_code}. Check if the split '{data_args.eval_split}' exists.")
+        return
+
     logger.info(f"Calculating metrics for {lang_code}...")
     wer = jiwer.wer(all_references, all_predictions)
-    # Wrap all_references in a list because sacrebleu expects a list of reference streams
     bleu = sacrebleu.corpus_bleu(all_predictions, [all_references])
     chrf = sacrebleu.corpus_chrf(all_predictions, [all_references], word_order=2)
 
@@ -214,7 +224,7 @@ def main():
             data_args, eval_args, dtype
         )
     else:
-        logger.info("Dataset B not provided. Skipping.")
+        logger.info("Dataset B not provided or incomplete. Skipping.")
 
     logger.info("Evaluation Complete.")
 

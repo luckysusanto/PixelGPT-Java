@@ -5,13 +5,13 @@
 
 # --- BU SCC Grid Engine Directives ---
 #$ -P multilm
-#$ -l gpus=2
-#$ -pe omp 2
+#$ -l gpus=4
+#$ -pe omp 4
 #$ -l gpu_type=A40
 #$ -l h_rt=24:00:00
-#$ -N DualGPT_Finetune_Itt
+#$ -N DualGPT_Finetune_Itt_bali3epoch
 #$ -j y
-#$ -o DualGPT_Finetune_Itt$JOB_ID.log
+#$ -o DualGPT_Finetune_Itt_mergedData$JOB_ID.log
 
 # --- Paths ---
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/scripts/training"
@@ -19,7 +19,7 @@ VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"
 CACHE_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache"
 
 # Output for the Fine-tuned model
-OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/finetune_transliteration"
+OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/mergedData-finetune-output"
 
 # Save the python code from the previous answer as this filename:
 PYTHON_SCRIPT_NAME="run_finetune_itt.py" 
@@ -28,11 +28,11 @@ TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
 # --- MODEL ARGUMENTS ---
 # Point this to the output directory of your PRETRAINING job.
 # Example: ".../experiment_output/mixedPretrain" or ".../mixedPretrain/checkpoint-50000"
-PRETRAINED_MODEL_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/mixedPretrain"
+PRETRAINED_MODEL_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/experiment_output/merged-pretrain-output/epoch-0" # 3-epoch
 
 # --- DATASETS ---
 # The Fine-tuning dataset (Must have Image and Text pairs)
-DATASET_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-poc-2/default/0.0.0"
+DATASET_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___balinese-pixelgpt-poc/default/0.0.0"
 
 # --- Dataset Columns ---
 # Ensure these match your Fine-Tuning dataset columns
@@ -44,7 +44,7 @@ TEXT_COLUMN="token_ids"
 PER_DEVICE_BATCH_SIZE=4
 GRADIENT_ACCUMULATION_STEPS=2
 LEARNING_RATE=2e-5
-NUM_EPOCHS=5
+NUM_EPOCHS=3
 DATALOADER_WORKERS=0
 
 # --- Logging ---
@@ -79,7 +79,7 @@ export NCCL_IB_DISABLE=1
 echo "Starting fine-tuning job..."
 echo "Loading weights from: ${PRETRAINED_MODEL_PATH}"
 
-accelerate launch --main_process_port 29701 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}" \
+accelerate launch --num_processes 4 --main_process_port 29701 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}" \
     --model_name_or_path "${PRETRAINED_MODEL_PATH}" \
     --dataset_name "${DATASET_PATH}" \
     --tokenizer_path "${TOKENIZER_PATH}" \

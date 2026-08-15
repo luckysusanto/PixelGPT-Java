@@ -9,7 +9,7 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 # === Authenticate (only needed once per environment) ===
 # You can get your token from https://huggingface.co/settings/tokens
 # Recommended: store in an environment variable instead of hardcoding
-HF_TOKEN = "CHANGEME"
+HF_TOKEN = "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"
 if HF_TOKEN:
     login(token=HF_TOKEN)
 else:
@@ -19,7 +19,7 @@ else:
 print(f"--- Starting dataset download to cache directory: {CACHE_DIR} ---")
 
 # === Download dataset ===
-dataset_name = "izzako/javanese-pixelgpt-debug"
+dataset_name = "izzako/balinese-pixelgpt"
 
 ds = load_dataset(
     dataset_name,

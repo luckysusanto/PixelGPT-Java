@@ -545,7 +545,9 @@ class JavaneseFontWrapper:
             bbox = self._pil_font.getbbox(text)
             text_width = max(bbox[2] - bbox[0], 1)
             text_height = max(bbox[3] - bbox[1], 1)
-            padding = 2
+            ## LUCKY EDITED THIS
+            # padding = 2
+            padding = 0
 
             img_width = text_width + padding * 2
             img_height = text_height + padding * 2
@@ -587,7 +589,9 @@ class JavaneseFontWrapper:
             bbox = self._pil_font.getbbox(text)
             text_width = max(bbox[2] - bbox[0], 1)
             text_height = max(bbox[3] - bbox[1], 1)
-            padding = 2
+            ## LUCKY EDITED THIS
+            # padding = 2
+            padding = 0
 
             # top reflects offset from baseline (negative = extends upward)
             return pygame.Rect(0, bbox[1] - padding, text_width + padding * 2, text_height + padding * 2)

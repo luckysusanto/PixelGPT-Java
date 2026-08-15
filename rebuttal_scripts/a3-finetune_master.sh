@@ -10,7 +10,7 @@
 # =============================================================================
 # 1. ASSIGNMENT CONFIGURATION (CHANGE THIS PER PERSON)
 # =============================================================================
-ASSIGNED_TOKENIZER="grapheme"  # Options: "llama2", "komodo", "mt5", "grapheme"
+ASSIGNED_TOKENIZER="komodo"  # Options: "llama2", "komodo", "mt5", "grapheme"
 
 # =============================================================================
 # 2. PATHS SETUP
@@ -39,12 +39,12 @@ DATASET_BALI_PURE="${PROJECT_DIR}/hf_cache_updated/datasets/Exqrch___rebuttal-pu
 # -----------------------------------------------------------------------------
 
 # --- Shared tokenizers (llama2, komodo, mt5) ---
-PRETRAIN_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_balinese"
-PRETRAIN_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_javanese"
-PRETRAIN_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_lampung"
-PRETRAIN_SUNDA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/mono_sundanese"
-PRETRAIN_DUAL_JAVA_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/dual_java_bali"
-PRETRAIN_DUAL_SUNDA_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/mt5/dual_sunda_lampung"
+PRETRAIN_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/mono_balinese"
+PRETRAIN_JAVA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/mono_javanese"
+PRETRAIN_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/mono_lampung"
+PRETRAIN_SUNDA="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/mono_sundanese"
+PRETRAIN_DUAL_JAVA_BALI="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/dual_java_bali/checkpoint-51000"
+PRETRAIN_DUAL_SUNDA_LAMPUNG="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/komodo/dual_sunda_lampung"
 
 # --- Grapheme-specific (separate model per script-aligned tokenizer) ---
 PRETRAIN_GRAPHEME_BALI_JAVA_TOK="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/rebuttal_experiment_output/grapheme/DEBUG-mono_balinese"
@@ -67,7 +67,7 @@ case $ASSIGNED_TOKENIZER in
     "llama2")   T_CODE="l2"; TEXT_COL="tok_llama2";   BASE_PORT=30700; TOK_BASE="ernie-research/DualGPT" ;;
     "komodo")   T_CODE="ko"; TEXT_COL="tok_komodo";   BASE_PORT=30710; TOK_BASE="Yellow-AI-NLP/komodo-7b-base" ;;
     "mt5")      T_CODE="m5"; TEXT_COL="tok_mt5";      BASE_PORT=30720; TOK_BASE="google/mt5-small" ;;
-    "grapheme") T_CODE="gr"; TEXT_COL="tok_grapheme"; BASE_PORT=30730; TOK_BASE="${TOK_JAVA}" ;;
+    "grapheme") T_CODE="gr"; TEXT_COL="tok_grapheme"; BASE_PORT=30740; TOK_BASE="${TOK_JAVA}" ;;
 esac
 
 # =============================================================================
@@ -142,35 +142,36 @@ echo "Tokenizer: $ASSIGNED_TOKENIZER"
 echo "=========================================================="
 
 if [ "$ASSIGNED_TOKENIZER" == "grapheme" ]; then
+    : # Skipping.
     # 1. Bali (Java tok) pretrained -> finetune Bali
-    submit_exp "phase1" "mono_bali_java-tok"          "bali_java-tok"       "$PRETRAIN_GRAPHEME_BALI_JAVA_TOK"      "bali"    "${TOK_JAVA}"
+    # submit_exp "phase1" "mono_bali_java-tok"          "bali_java-tok"       "$PRETRAIN_GRAPHEME_BALI_JAVA_TOK"      "bali"    "${TOK_JAVA}"
 
     # 2. Bali (Bali tok) pretrained -> finetune Bali
     # Uses DATASET_BALI_PURE: Bali data tokenized with the native Balinese tokenizer.
-    submit_exp "phase1" "mono_bali_bali-tok"          "bali_bali-tok"       "$PRETRAIN_GRAPHEME_BALI_BALI_TOK"      "bali"    "${TOK_BALI}"  "${DATASET_BALI_PURE}"
+    # submit_exp "phase1" "mono_bali_bali-tok"          "bali_bali-tok"       "$PRETRAIN_GRAPHEME_BALI_BALI_TOK"      "bali"    "${TOK_BALI}"  "${DATASET_BALI_PURE}"
 
-    # 3. Java pretrained -> finetune Java
-    submit_exp "phase1" "mono_java"                   "java"                "$PRETRAIN_GRAPHEME_JAVA"               "java"    "${TOK_JAVA}"
+    # # 3. Java pretrained -> finetune Java
+    # submit_exp "phase1" "mono_java"                   "java"                "$PRETRAIN_GRAPHEME_JAVA"               "java"    "${TOK_JAVA}"
 
-    # 4. Lampung pretrained -> finetune Lampung
-    # NOTE: No Lampung-specific grapheme tokenizer exists; Sunda grapheme tokenizer used.
-    # This is intentional — measures partial tokenizer-script alignment.
-    submit_exp "phase1" "mono_lampung"                "lampung"             "$PRETRAIN_GRAPHEME_LAMPUNG"            "lampung" "${TOK_SUNDA}"
+    # # 4. Lampung pretrained -> finetune Lampung
+    # # NOTE: No Lampung-specific grapheme tokenizer exists; Sunda grapheme tokenizer used.
+    # # This is intentional — measures partial tokenizer-script alignment.
+    # submit_exp "phase1" "mono_lampung"                "lampung"             "$PRETRAIN_GRAPHEME_LAMPUNG"            "lampung" "${TOK_SUNDA}"
 
-    # 5. Sunda pretrained -> finetune Sunda
-    submit_exp "phase1" "mono_sunda"                  "sunda"               "$PRETRAIN_GRAPHEME_SUNDA"              "sunda"   "${TOK_SUNDA}"
+    # # 5. Sunda pretrained -> finetune Sunda
+    # submit_exp "phase1" "mono_sunda"                  "sunda"               "$PRETRAIN_GRAPHEME_SUNDA"              "sunda"   "${TOK_SUNDA}"
 
-    # 6. Bali + Java pretrained -> finetune Java
-    submit_exp "phase1" "dual_java_bali_ft-java"      "dual_java_bali"      "$PRETRAIN_GRAPHEME_DUAL_JAVA_BALI"     "java"    "${TOK_JAVA}"
+    # # 6. Bali + Java pretrained -> finetune Java
+    # submit_exp "phase1" "dual_java_bali_ft-java"      "dual_java_bali"      "$PRETRAIN_GRAPHEME_DUAL_JAVA_BALI"     "java"    "${TOK_JAVA}"
 
-    # 7. Bali + Java pretrained -> finetune Bali
-    submit_exp "phase1" "dual_java_bali_ft-bali"      "dual_java_bali"      "$PRETRAIN_GRAPHEME_DUAL_JAVA_BALI"     "bali"    "${TOK_JAVA}"
+    # # 7. Bali + Java pretrained -> finetune Bali
+    # submit_exp "phase1" "dual_java_bali_ft-bali"      "dual_java_bali"      "$PRETRAIN_GRAPHEME_DUAL_JAVA_BALI"     "bali"    "${TOK_JAVA}"
 
-    # 8. Lampung + Sunda pretrained -> finetune Sunda
-    submit_exp "phase1" "dual_sunda_lampung_ft-sunda"   "dual_sunda_lampung" "$PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG" "sunda"   "${TOK_SUNDA}"
+    # # 8. Lampung + Sunda pretrained -> finetune Sunda
+    # submit_exp "phase1" "dual_sunda_lampung_ft-sunda"   "dual_sunda_lampung" "$PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG" "sunda"   "${TOK_SUNDA}"
 
-    # 9. Lampung + Sunda pretrained -> finetune Lampung
-    submit_exp "phase1" "dual_sunda_lampung_ft-lampung" "dual_sunda_lampung" "$PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG" "lampung" "${TOK_SUNDA}"
+    # # 9. Lampung + Sunda pretrained -> finetune Lampung
+    # submit_exp "phase1" "dual_sunda_lampung_ft-lampung" "dual_sunda_lampung" "$PRETRAIN_GRAPHEME_DUAL_SUNDA_LAMPUNG" "lampung" "${TOK_SUNDA}"
 
 elif [ "$ASSIGNED_TOKENIZER" == "llama2" ]; then
     submit_exp "phase1" "mono_bali"                     "bali"               "$PRETRAIN_BALI"               "bali"
@@ -187,20 +188,18 @@ elif [ "$ASSIGNED_TOKENIZER" == "komodo" ]; then
     submit_exp "phase1" "mono_java"                     "java"               "$PRETRAIN_JAVA"               "java"
     submit_exp "phase1" "mono_lampung"                  "lampung"            "$PRETRAIN_LAMPUNG"            "lampung"
     submit_exp "phase1" "mono_sunda"                    "sunda"              "$PRETRAIN_SUNDA"              "sunda"
-    submit_exp "phase1" "dual_java_bali_ft-java"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "java"
-    submit_exp "phase1" "dual_java_bali_ft-bali"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "bali"    # FIX: was missing
-    submit_exp "phase1" "dual_sunda_lampung_ft-sunda"   "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "sunda"
-    submit_exp "phase1" "dual_sunda_lampung_ft-lampung" "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "lampung" # FIX: was missing
+    submit_exp "phase1" "dual_java_bali"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "java"
+    submit_exp "phase1" "dual_sunda_lampung"   "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "sunda"
 
 elif [ "$ASSIGNED_TOKENIZER" == "mt5" ]; then
-    submit_exp "phase1" "mono_bali"                     "bali"               "$PRETRAIN_BALI"               "bali"
-    submit_exp "phase1" "mono_java"                     "java"               "$PRETRAIN_JAVA"               "java"
-    submit_exp "phase1" "mono_lampung"                  "lampung"            "$PRETRAIN_LAMPUNG"            "lampung"
-    submit_exp "phase1" "mono_sunda"                    "sunda"              "$PRETRAIN_SUNDA"              "sunda"
-    submit_exp "phase1" "dual_java_bali_ft-java"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "java"
+    # submit_exp "phase1" "mono_bali"                     "bali"               "$PRETRAIN_BALI"               "bali"
+    # submit_exp "phase1" "mono_java"                     "java"               "$PRETRAIN_JAVA"               "java"
+    # submit_exp "phase1" "mono_lampung"                  "lampung"            "$PRETRAIN_LAMPUNG"            "lampung"
+    # submit_exp "phase1" "mono_sunda"                    "sunda"              "$PRETRAIN_SUNDA"              "sunda"
+    # submit_exp "phase1" "dual_java_bali_ft-java"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "java"
     submit_exp "phase1" "dual_java_bali_ft-bali"        "dual_java_bali"     "$PRETRAIN_DUAL_JAVA_BALI"     "bali"    # FIX: was missing
-    submit_exp "phase1" "dual_sunda_lampung_ft-sunda"   "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "sunda"
-    submit_exp "phase1" "dual_sunda_lampung_ft-lampung" "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "lampung" # FIX: was missing
+    # submit_exp "phase1" "dual_sunda_lampung_ft-sunda"   "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "sunda"
+    # submit_exp "phase1" "dual_sunda_lampung_ft-lampung" "dual_sunda_lampung" "$PRETRAIN_DUAL_SUNDA_LAMPUNG" "lampung" # FIX: was missing
 
 fi
 
@@ -231,21 +230,21 @@ echo "=========================================================="
 
 if [ "$ASSIGNED_TOKENIZER" == "grapheme" ]; then
     # 1. Bali (Java tok) pretrained -> finetune Java
-    submit_exp "phase2" "cross_bali_java-tok_ft-java" "bali_java-tok" "$PRETRAIN_GRAPHEME_BALI_JAVA_TOK" "java" "${TOK_JAVA}"
+    # submit_exp "phase2" "cross_bali_java-tok_ft-java" "bali_java-tok" "$PRETRAIN_GRAPHEME_BALI_JAVA_TOK" "java" "${TOK_JAVA}"
 
     # 2. Bali (Bali tok) pretrained -> finetune Java
     # NOTE: Intentional stress test — Bali tokenizer has never seen Java script.
     # Measures cross-script transfer with misaligned tokenizer.
-    submit_exp "phase2" "cross_bali_bali-tok_ft-java" "bali_bali-tok" "$PRETRAIN_GRAPHEME_BALI_BALI_TOK" "java" "${TOK_BALI}" "${DATASET_BALI_PURE}"
+    submit_exp "phase2" "cross_bali_bali-tok_ft-java" "bali_bali-tok" "$PRETRAIN_GRAPHEME_BALI_BALI_TOK" "java" "${TOK_BALI}"
 
     # 3. Java pretrained -> finetune Bali
-    submit_exp "phase2" "cross_java_ft-bali"          "java"          "$PRETRAIN_GRAPHEME_JAVA"          "bali"    "${TOK_JAVA}"
+    # submit_exp "phase2" "cross_java_ft-bali"          "java"          "$PRETRAIN_GRAPHEME_JAVA"          "bali"    "${TOK_JAVA}"
 
     # 4. Lampung pretrained -> finetune Sunda
-    submit_exp "phase2" "cross_lampung_ft-sunda"      "lampung"       "$PRETRAIN_GRAPHEME_LAMPUNG"       "sunda"   "${TOK_SUNDA}"
+    # submit_exp "phase2" "cross_lampung_ft-sunda"      "lampung"       "$PRETRAIN_GRAPHEME_LAMPUNG"       "sunda"   "${TOK_SUNDA}"
 
     # 5. Sunda pretrained -> finetune Lampung
-    submit_exp "phase2" "cross_sunda_ft-lampung"      "sunda"         "$PRETRAIN_GRAPHEME_SUNDA"         "lampung" "${TOK_SUNDA}"
+    # submit_exp "phase2" "cross_sunda_ft-lampung"      "sunda"         "$PRETRAIN_GRAPHEME_SUNDA"         "lampung" "${TOK_SUNDA}"
 
 elif [ "$ASSIGNED_TOKENIZER" == "llama2" ]; then
     submit_exp "phase2" "cross_bali_ft-java"     "bali"    "$PRETRAIN_BALI"    "java"
@@ -260,10 +259,10 @@ elif [ "$ASSIGNED_TOKENIZER" == "komodo" ]; then
     submit_exp "phase2" "cross_sunda_ft-lampung" "sunda"   "$PRETRAIN_SUNDA"   "lampung"
 
 elif [ "$ASSIGNED_TOKENIZER" == "mt5" ]; then
-    submit_exp "phase2" "cross_bali_ft-java"     "bali"    "$PRETRAIN_BALI"    "java"
+    # submit_exp "phase2" "cross_bali_ft-java"     "bali"    "$PRETRAIN_BALI"    "java"
     submit_exp "phase2" "cross_java_ft-bali"     "java"    "$PRETRAIN_JAVA"    "bali"
-    submit_exp "phase2" "cross_lampung_ft-sunda" "lampung" "$PRETRAIN_LAMPUNG" "sunda"
-    submit_exp "phase2" "cross_sunda_ft-lampung" "sunda"   "$PRETRAIN_SUNDA"   "lampung"
+    # submit_exp "phase2" "cross_lampung_ft-sunda" "lampung" "$PRETRAIN_LAMPUNG" "sunda"
+    # submit_exp "phase2" "cross_sunda_ft-lampung" "sunda"   "$PRETRAIN_SUNDA"   "lampung"
 
 fi
 

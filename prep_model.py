@@ -3,9 +3,17 @@ import argparse
 import logging
 from transformers import AutoTokenizer
 from src.ernie_pixel.modeling_ernie_pixel import ErniePixelForCausalLM
+from huggingface_hub import login
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+HF_TOKEN = "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"
+if HF_TOKEN:
+    login(token=HF_TOKEN)
+else:
+    print("⚠️  No HF_TOKEN found in environment. Set it via:")
+    print("    export HF_TOKEN='your_token_here'")
 
 def main():
     """

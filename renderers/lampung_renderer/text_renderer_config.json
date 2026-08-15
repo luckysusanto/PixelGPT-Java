@@ -3,9 +3,9 @@
     "dpi": 120,
     "font_color": "black",
     "font_file": "Had Lampung Yuza Rounded.ttf",
-    "font_size": 10,
+    "font_size": 6,
     "max_seq_length": 1024,
-    "pad_size": 3,
+    "pad_size": 0,
     "pixels_per_patch": 16,
     "text_renderer_type": "TextRenderer"
   }

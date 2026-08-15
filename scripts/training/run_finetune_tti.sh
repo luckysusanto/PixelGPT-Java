@@ -5,8 +5,8 @@
 
 # --- BU SCC Grid Engine Directives ---
 #$ -P multilm
-#$ -l gpus=2
-#$ -pe omp 2
+#$ -l gpus=4
+#$ -pe omp 4
 #$ -l gpu_type=A40
 #$ -l h_rt=24:00:00
 #$ -N DualGPT_Finetune_Tti
@@ -79,7 +79,7 @@ export NCCL_IB_DISABLE=1
 echo "Starting fine-tuning job..."
 echo "Loading weights from: ${PRETRAINED_MODEL_PATH}"
 
-accelerate launch --main_process_port 29701 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}" \
+accelerate launch --num_processes 4 --main_process_port 29701 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}" \
     --model_name_or_path "${PRETRAINED_MODEL_PATH}" \
     --dataset_name "${DATASET_PATH}" \
     --tokenizer_path "${TOKENIZER_PATH}" \

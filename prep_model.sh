@@ -8,14 +8,14 @@
 
 # --- Paths ---
 # The original pretrained model from the Hugging Face Hub
-export BASE_MODEL="hf_cache/models/DualGPT-vocabResize"
+export BASE_MODEL="ernie-research/DualGPT"
 
 # Your custom tokenizer from the Hugging Face Hub or a local path
-export TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
+export TOKENIZER_PATH="ernie-research/DualGPT"
 
 # --- !!! SET THIS VARIABLE !!! ---
 # This is the cache directory where the NEW, ADAPTED model will be saved.
-export MODEL_CACHE="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/models/dualGPT-vocabResize"
+export MODEL_CACHE="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/models/dualGPT"
 
 # Path to your Python environment and the surgery script
 export VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"

@@ -9,9 +9,9 @@
 #$ -pe omp 4
 #$ -l gpu_type=A40
 #$ -l h_rt=25:00:00  # Give 1 additional hour for data loading and training.
-#$ -N DATASETDEBUG_Pretrain
+#$ -N P_JavaBali-Custom_Tokenizer
 #$ -j y
-#$ -o DATASETDEBUG_Pretrain-$JOB_ID.log
+#$ -o P_JavaBali-Custom_Tokenizer-$JOB_ID.log
 
 # --- Paths ---
 PROJECT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updatedScripts/train"
@@ -19,19 +19,22 @@ VENV_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt_env/"
 CACHE_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache"
 
 # Root Output Directory
-OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/DatasetDebug-Pretrain"
+OUTPUT_DIR="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/_updated_experiment_output/Pretrain_JavaBali-Custom_Tokenizer"
 PYTHON_SCRIPT_NAME="pretrain_erniepixel.py" 
 TOKENIZER_PATH="izzako/javanese-llama-tokenizer"
+DEFAULT_TOKENIZER_PATH="ernie-research/DualGPT"
 MODEL_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/models/dualGPT-vocabResize"
+DEFAULT_MODEL_PATH="ernie-research/DualGPT"
 
 # --- DATASETS ---
 # Define your datasets here. 
-DATASET_A_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt-debug/default/0.0.0"
+DATASET_A_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___javanese-pixelgpt/default/0.0.0"
 
 # Optional: Leave empty string "" if not using a second dataset
-DATASET_B_PATH=""
+DATASET_B_PATH="/projectnb/multilm/lsusanto/PixelGPT/pixelgpt/hf_cache/izzako___balinese-pixelgpt/default/0.0.0"
 
 TEXT_COLUMN="grapheme_token_ids"
+LLAMA_TEXT_COLUMN="llama_token_ids"
 # --- Training Arguments ---
 PER_DEVICE_BATCH_SIZE=2
 GRADIENT_ACCUMULATION_STEPS=4
@@ -76,7 +79,7 @@ echo "Dataset A: ${DATASET_A_PATH}"
 
 # Construct Command Array
 CMD=(
-    accelerate launch --main_process_port 29700 --num_processes 4 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}"
+    accelerate launch --main_process_port 29704 --num_processes 4 "${PROJECT_DIR}/${PYTHON_SCRIPT_NAME}"
     --model_name_or_path "${MODEL_PATH}"
     --dataset_a_name "${DATASET_A_PATH}"
     --tokenizer_path "${TOKENIZER_PATH}"
